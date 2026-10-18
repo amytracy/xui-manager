@@ -1,0 +1,247 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "a9bcc4317170498bf127e7abc252d041",
+    "entities": [
+      {
+        "tableName": "servers",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `host` TEXT NOT NULL, `sshPort` INTEGER NOT NULL, `sshUser` TEXT NOT NULL, `authType` TEXT NOT NULL, `hostKeyAlgorithm` TEXT, `hostKeyFingerprint` TEXT, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `domain` TEXT, `panel_version` TEXT, `panel_port` INTEGER, `panel_webBasePath` TEXT, `panel_username` TEXT, `panel_subScheme` TEXT, `panel_subPort` INTEGER, `panel_subPath` TEXT, `panel_defaultInboundId` INTEGER, `panel_deployedAt` INTEGER, `panel_host` TEXT, `panel_selfstealPort` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "host",
+            "columnName": "host",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sshPort",
+            "columnName": "sshPort",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sshUser",
+            "columnName": "sshUser",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "authType",
+            "columnName": "authType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hostKeyAlgorithm",
+            "columnName": "hostKeyAlgorithm",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "hostKeyFingerprint",
+            "columnName": "hostKeyFingerprint",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "domain",
+            "columnName": "domain",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "panel.version",
+            "columnName": "panel_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "panel.port",
+            "columnName": "panel_port",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "panel.webBasePath",
+            "columnName": "panel_webBasePath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "panel.username",
+            "columnName": "panel_username",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "panel.subScheme",
+            "columnName": "panel_subScheme",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "panel.subPort",
+            "columnName": "panel_subPort",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "panel.subPath",
+            "columnName": "panel_subPath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "panel.defaultInboundId",
+            "columnName": "panel_defaultInboundId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "panel.deployedAt",
+            "columnName": "panel_deployedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "panel.host",
+            "columnName": "panel_host",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "panel.selfstealPort",
+            "columnName": "panel_selfstealPort",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "deploy_jobs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `serverId` INTEGER NOT NULL, `mode` TEXT NOT NULL, `paramsJson` TEXT NOT NULL, `remoteDir` TEXT NOT NULL, `state` TEXT NOT NULL, `stage` TEXT, `errorCode` TEXT, `warnings` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `launchedAt` INTEGER, `finishedAt` INTEGER, FOREIGN KEY(`serverId`) REFERENCES `servers`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "serverId",
+            "columnName": "serverId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mode",
+            "columnName": "mode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "paramsJson",
+            "columnName": "paramsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remoteDir",
+            "columnName": "remoteDir",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stage",
+            "columnName": "stage",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "errorCode",
+            "columnName": "errorCode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "warnings",
+            "columnName": "warnings",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "launchedAt",
+            "columnName": "launchedAt",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "finishedAt",
+            "columnName": "finishedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_deploy_jobs_serverId",
+            "unique": false,
+            "columnNames": [
+              "serverId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_deploy_jobs_serverId` ON `${TABLE_NAME}` (`serverId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "servers",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "serverId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a9bcc4317170498bf127e7abc252d041')"
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+#!/bin/bash
+[ "$1" = ahostsv4 ] || exit 2
+case "$2" in
+  *10-0-2-2*|*.sslip.io) echo "10.0.2.2        STREAM $2"; echo "10.0.2.2        DGRAM" ;;
+  *) exit 2 ;;
+esac

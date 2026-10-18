@@ -1,0 +1,6 @@
+#!/bin/bash
+case "$1" in
+  *caddy.tar.gz) echo "@CADDY_SHA@  $1" ;;
+  *install.sh) echo "@INSTALLER_SHA@  $1" ;;
+  *) shasum -a 256 "$@" ;;
+esac

@@ -1,0 +1,2 @@
+#!/bin/bash
+if [ "$1" = -m ]; then echo x86_64; else /usr/bin/uname "$@"; fi

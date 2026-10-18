@@ -1,0 +1,6 @@
+#!/bin/bash
+case "$1" in
+  x509) case "$*" in *-checkend*) exit 0 ;; *-checkip*) echo "IP address does match certificate" ;; *-checkhost*) echo "Hostname does match certificate" ;; esac ;;
+  verify) [ -f "@STAND@/trusted" ] && exit 0 || exit 2 ;;
+  *) /opt/homebrew/bin/openssl "$@" ;;
+esac

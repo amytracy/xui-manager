@@ -1,0 +1,7 @@
+#!/bin/bash
+echo "systemctl $*" >> "@STAND@/calls"
+case "$*" in
+  "restart xui-caddy") sleep 1; echo 8443 >> "@STAND@/listening" ;;
+  "restart x-ui") sleep 2 ;;
+esac
+exit 0

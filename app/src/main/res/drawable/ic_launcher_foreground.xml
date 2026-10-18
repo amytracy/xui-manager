@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stylised server rack with a check mark. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M34,32h40a4,4 0,0 1,4 4v10a4,4 0,0 1,-4 4h-40a4,4 0,0 1,-4 -4v-10a4,4 0,0 1,4 -4z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M34,56h22v18h-22a4,4 0,0 1,-4 -4v-10a4,4 0,0 1,4 -4z" />
+    <path
+        android:fillColor="#FF1F3A5F"
+        android:pathData="M38,39h4v4h-4z M46,39h4v4h-4z M38,63h4v4h-4z" />
+    <path
+        android:fillColor="#FF7FD1AE"
+        android:pathData="M60,66l6,6l12,-14l-3.5,-3l-8.5,10l-2.5,-2.5z" />
+</vector>

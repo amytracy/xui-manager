@@ -1,0 +1,4 @@
+#!/bin/bash
+echo "caddy $*" >> "@STAND@/calls"
+[ "$1" = version ] && echo "v@CADDY_VERSION@ h1:stand"
+exit 0

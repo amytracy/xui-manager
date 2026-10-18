@@ -1,0 +1,25 @@
+#!/bin/bash
+S="@STAND@"
+echo "x-ui $*" >> "$S/calls"
+case "$1" in
+  -v) echo "v3.10.2" ;;
+  cert) echo "$3 $5" > "$S/panel-cert"; exit 0 ;;
+  setting)
+    shift
+    case "$1" in
+      -getCert) if [ -s "$S/panel-cert" ]; then read -r c k < "$S/panel-cert"; echo "cert: $c"; echo "key: $k"; else echo "cert: "; echo "key: "; fi; exit 0 ;;
+      -h) echo "  -getApiToken  Print an API token" >&2; exit 0 ;;
+      -show) printf 'port: %s\nwebBasePath: /\n' "$(cat "$S/panel-port" 2>/dev/null)"; exit 0 ;;
+      -getApiToken) echo "apiToken: tok-e2e"; exit 0 ;;
+    esac
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -port) echo "$2" > "$S/panel-port"; echo "$2" >> "$S/listening" ;;
+        -username) echo "$2" > "$S/panel-username" ;;
+        -password) echo "$2" > "$S/panel-password" ;;
+      esac
+      shift
+    done
+    echo "set username and password success"
+    ;;
+esac
