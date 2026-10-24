@@ -463,4 +463,47 @@ class V3PanelApiTest {
         assertEquals(3, body["nodeId"]!!.jsonPrimitive.int)
         assertEquals("node", body["shareAddrStrategy"]!!.jsonPrimitive.content)
     }
+
+    @Test
+    fun `self-update checks, starts and reports through its routes`() = runBlocking {
+        respond("""{"success":true,"obj":{"channel":"stable","currentVersion":"v3.10.2","latestVersion":"v3.11.0","updateAvailable":true}}""")
+        respond("""{"success":true,"msg":"Panel update started","obj":{"runId":"1735689600123456789"}}""")
+        respond("""{"success":true,"obj":{"runId":"1735689600123456789","state":"failed","exitCode":2,"finishedAt":1735689612}}""")
+        respond("""{"success":true,"obj":[{"id":1,"name":"de-1","ok":true},{"id":2,"name":"fr-1","ok":false,"error":"node is offline"}]}""")
+        respond("""{"success":false}""")
+
+        val api = api()
+        assertTrue(api.capabilities.selfUpdate)
+        assertEquals(PanelUpdateInfo("v3.10.2", "v3.11.0", true), api.panelUpdateInfo())
+        assertEquals("1735689600123456789", api.startPanelUpdate())
+        assertEquals(PanelUpdateRun("1735689600123456789", "failed", 2), api.panelUpdateStatus())
+        assertEquals(
+            listOf(NodeUpdateResult(1, "de-1", true, ""), NodeUpdateResult(2, "fr-1", false, "node is offline")),
+            api.updateNodePanels(listOf(1, 2)),
+        )
+        // No access to GitHub from the server: the panel answers success=false without a message.
+        try {
+            api.panelUpdateInfo()
+            fail("expected a panel error")
+        } catch (e: AppException) {
+            assertTrue(e.error is AppError.PanelError)
+        }
+
+        val info = server.takeRequest()
+        assertEquals("GET", info.method)
+        assertEquals("/s3cretPath/panel/api/server/getPanelUpdateInfo", info.url.encodedPath)
+        val start = server.takeRequest()
+        assertEquals("POST", start.method)
+        assertEquals("/s3cretPath/panel/api/server/updatePanel", start.url.encodedPath)
+        assertEquals("/s3cretPath/panel/api/server/getUpdateStatus", server.takeRequest().url.encodedPath)
+        val nodes = server.takeRequest()
+        assertEquals("/s3cretPath/panel/api/nodes/updatePanel", nodes.url.encodedPath)
+        assertEquals("""{"ids":[1,2],"dev":false}""", nodes.body!!.utf8())
+    }
+
+    @Test
+    fun `a status file the panel has not written yet reads as pending`() = runBlocking {
+        respond("""{"success":true,"obj":{"runId":"","state":"","exitCode":0,"finishedAt":0}}""")
+        assertEquals(PanelUpdateRun("", "pending", 0), api().panelUpdateStatus())
+    }
 }

@@ -47,9 +47,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.autorasqr.xuimanager.R
 import dev.autorasqr.xuimanager.data.deploy.DeployConfig
 import dev.autorasqr.xuimanager.data.panel.PanelVersion
+import dev.autorasqr.xuimanager.domain.model.DeployState
 import dev.autorasqr.xuimanager.domain.model.PanelLogin
+import dev.autorasqr.xuimanager.domain.model.PanelUpdateOffer
 import dev.autorasqr.xuimanager.domain.model.Server
 import dev.autorasqr.xuimanager.ui.common.Clipboard
+import dev.autorasqr.xuimanager.ui.common.JobLog
 import dev.autorasqr.xuimanager.ui.common.SecureScreen
 import dev.autorasqr.xuimanager.ui.common.Formatters
 import dev.autorasqr.xuimanager.ui.common.message
@@ -72,6 +75,11 @@ fun ServerDetailScreen(
     val deployRunning by viewModel.deployRunning.collectAsStateWithLifecycle()
     val status by viewModel.status.collectAsStateWithLifecycle()
     val panelLogin by viewModel.panelLogin.collectAsStateWithLifecycle()
+    val updateOffer by viewModel.updateOffer.collectAsStateWithLifecycle()
+    val showUpdateDialog by viewModel.showUpdateDialog.collectAsStateWithLifecycle()
+    val panelUpdate by viewModel.panelUpdate.collectAsStateWithLifecycle()
+    val systemUpdate by viewModel.systemUpdate.collectAsStateWithLifecycle()
+    val confirmSystemUpdate by viewModel.confirmSystemUpdate.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         viewModel.refreshDeployState()
         viewModel.startStatusUpdates()
@@ -118,9 +126,40 @@ fun ServerDetailScreen(
                     }
                 }
             }
+            panelUpdate?.let { job ->
+                JobLog(
+                    title = when (job.state) {
+                        DeployState.RUNNING -> stringResource(R.string.panel_update_running, job.targetVersion)
+                        DeployState.SUCCEEDED -> stringResource(R.string.panel_update_done, job.targetVersion)
+                        DeployState.FAILED -> stringResource(R.string.panel_update_failed)
+                    },
+                    state = job.state,
+                    log = job.log,
+                    error = job.error,
+                    onDismiss = viewModel::dismissPanelUpdate,
+                )
+            }
+            systemUpdate?.let { job ->
+                JobLog(
+                    title = stringResource(
+                        when (job.state) {
+                            DeployState.RUNNING -> R.string.sysupdate_running
+                            DeployState.SUCCEEDED -> if (job.rebooting) R.string.sysupdate_rebooting else R.string.sysupdate_done
+                            DeployState.FAILED -> R.string.sysupdate_failed
+                        },
+                    ),
+                    state = job.state,
+                    log = job.log,
+                    error = job.error,
+                    onDismiss = viewModel::dismissSystemUpdate,
+                )
+            }
             PanelCard(
                 server = current,
                 deployRunning = deployRunning,
+                updateOffer = updateOffer,
+                updating = panelUpdate?.state == DeployState.RUNNING,
+                onUpdatePanel = viewModel::startPanelUpdate,
                 onDeploy = { onDeploy(current.id) },
                 onClients = { onClients(current.id) },
                 onInbounds = { onInbounds(current.id) },
@@ -132,8 +171,33 @@ fun ServerDetailScreen(
             if (current.panel != null) {
                 StatusCard(status, onRestart = viewModel::requestRestart)
             }
-            SshCard(current)
+            SshCard(
+                server = current,
+                updateEnabled = !deployRunning && systemUpdate?.state != DeployState.RUNNING,
+                onSystemUpdate = viewModel::requestSystemUpdate,
+            )
         }
+    }
+
+    val offer = updateOffer
+    if (showUpdateDialog && offer != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissUpdateDialog,
+            title = { Text(stringResource(R.string.panel_update_title)) },
+            text = { Text(updateOfferText(offer)) },
+            confirmButton = { TextButton(onClick = viewModel::startPanelUpdate) { Text(stringResource(R.string.panel_update_confirm)) } },
+            dismissButton = { TextButton(onClick = viewModel::dismissUpdateDialog) { Text(stringResource(R.string.panel_update_later)) } },
+        )
+    }
+
+    if (confirmSystemUpdate) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissSystemUpdateConfirm,
+            title = { Text(stringResource(R.string.sysupdate_confirm_title)) },
+            text = { Text(stringResource(R.string.sysupdate_confirm_text, server?.name.orEmpty())) },
+            confirmButton = { TextButton(onClick = viewModel::startSystemUpdate) { Text(stringResource(R.string.sysupdate_confirm)) } },
+            dismissButton = { TextButton(onClick = viewModel::dismissSystemUpdateConfirm) { Text(stringResource(R.string.cancel)) } },
+        )
     }
 
     if (status.confirmRestart) {
@@ -199,7 +263,17 @@ private fun StatusCard(state: StatusUiState, onRestart: () -> Unit) {
 }
 
 @Composable
-private fun SshCard(server: Server) {
+private fun updateOfferText(offer: PanelUpdateOffer): String {
+    val lines = buildList {
+        add(stringResource(R.string.panel_update_text, offer.latestVersion))
+        offer.master?.let { add(stringResource(R.string.panel_update_master, it.name, it.currentVersion)) }
+        offer.nodes.forEach { add(stringResource(R.string.panel_update_node, it.name, it.currentVersion)) }
+    }
+    return lines.joinToString("\n") + "\n\n" + stringResource(R.string.panel_update_note)
+}
+
+@Composable
+private fun SshCard(server: Server, updateEnabled: Boolean, onSystemUpdate: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.server_ssh), style = MaterialTheme.typography.titleMedium)
@@ -218,6 +292,9 @@ private fun SshCard(server: Server) {
                     )
                 }
             }
+            OutlinedButton(onClick = onSystemUpdate, enabled = updateEnabled, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.action_system_update))
+            }
         }
     }
 }
@@ -226,6 +303,9 @@ private fun SshCard(server: Server) {
 private fun PanelCard(
     server: Server,
     deployRunning: Boolean,
+    updateOffer: PanelUpdateOffer?,
+    updating: Boolean,
+    onUpdatePanel: () -> Unit,
     onDeploy: () -> Unit,
     onClients: () -> Unit,
     onInbounds: () -> Unit,
@@ -247,6 +327,20 @@ private fun PanelCard(
                 InfoRow(stringResource(R.string.panel_port), panel.port.toString())
                 InfoRow(stringResource(R.string.panel_subscription), "${panel.subScheme.uppercase()} :${panel.subPort}")
                 InfoRow(stringResource(R.string.panel_deployed_at), Formatters.dateTime(panel.deployedAt))
+                if (updateOffer != null && !server.isNode) {
+                    if (updateOffer.master != null) {
+                        Text(stringResource(R.string.panel_update_available, updateOffer.latestVersion), color = MaterialTheme.colorScheme.primary)
+                    }
+                    if (updateOffer.nodes.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.panel_update_available_nodes, updateOffer.nodes.joinToString { it.name }),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Button(onClick = onUpdatePanel, enabled = !updating && !deployRunning, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.action_update_panel, updateOffer.latestVersion))
+                    }
+                }
                 if (server.isNode) {
                     // Clients, inbounds and subscriptions of a node live on the main panel.
                     Text(

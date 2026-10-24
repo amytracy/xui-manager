@@ -16,6 +16,7 @@ import dev.autorasqr.xuimanager.domain.model.ValidationField
 import dev.autorasqr.xuimanager.domain.repository.ServerRepository
 import dev.autorasqr.xuimanager.domain.usecase.ServerDraftValidator
 import dev.autorasqr.xuimanager.ui.common.asAppError
+import dev.autorasqr.xuimanager.ui.common.readNBytesCompat
 import dev.autorasqr.xuimanager.ui.navigation.ServerEditRoute
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -253,15 +254,4 @@ class ServerEditViewModel @Inject constructor(
         fun normalizeDomain(value: String): String =
             value.trim().lowercase().substringAfter("://").substringBefore('/').substringBefore(':').trimEnd('.')
     }
-}
-
-private fun java.io.InputStream.readNBytesCompat(limit: Int): ByteArray {
-    val buffer = java.io.ByteArrayOutputStream()
-    val chunk = ByteArray(8 * 1024)
-    while (buffer.size() < limit) {
-        val read = read(chunk, 0, minOf(chunk.size, limit - buffer.size()))
-        if (read < 0) break
-        buffer.write(chunk, 0, read)
-    }
-    return buffer.toByteArray()
 }

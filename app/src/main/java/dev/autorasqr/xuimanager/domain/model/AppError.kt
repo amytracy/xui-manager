@@ -31,6 +31,10 @@ sealed interface AppError {
     data class SelfStealFailed(val reason: SelfStealIssue) : AppError
     /** The RoscomVPN geo files could not be downloaded or did not match their published checksum. */
     data object GeodataFailed : AppError
+    /** apt/dnf upgrade failed; [detail] is "lock" when the package manager stayed busy. */
+    data class SystemUpdateFailed(val detail: String?) : AppError
+    /** The panel's own updater failed or did not report back; [detail] is the panel's message or the exit code. */
+    data class PanelUpdateFailed(val detail: String?) : AppError
     data object PanelUnauthorized : AppError
     data object PanelNotFound : AppError
     data object PanelNotDeployed : AppError

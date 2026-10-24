@@ -86,6 +86,7 @@ import dev.autorasqr.xuimanager.domain.model.ValidationField
 import dev.autorasqr.xuimanager.ui.common.FingerprintField
 import dev.autorasqr.xuimanager.ui.common.HostKeyDialog
 import dev.autorasqr.xuimanager.ui.common.SelectField
+import dev.autorasqr.xuimanager.ui.common.SitePageField
 import dev.autorasqr.xuimanager.ui.common.SniField
 import dev.autorasqr.xuimanager.ui.common.label
 import dev.autorasqr.xuimanager.ui.common.labelRes
@@ -227,6 +228,9 @@ private fun SetupContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (state.selfSteal) {
+                        SitePageField(state.sitePage, onPick = viewModel::onSitePage, onReset = viewModel::resetSitePage)
+                    }
                 }
                 if (domain == null || !state.selfSteal) {
                     val autoLabel = stringResource(R.string.deploy_sni_auto)

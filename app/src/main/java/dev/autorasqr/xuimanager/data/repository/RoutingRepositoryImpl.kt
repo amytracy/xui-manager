@@ -9,6 +9,7 @@ import dev.autorasqr.xuimanager.data.error.ioMapped
 import dev.autorasqr.xuimanager.data.error.toAppError
 import dev.autorasqr.xuimanager.data.panel.PanelApi
 import dev.autorasqr.xuimanager.data.panel.PanelApiProvider
+import dev.autorasqr.xuimanager.data.panel.awaitOnline
 import dev.autorasqr.xuimanager.data.routing.RoscomVpn
 import dev.autorasqr.xuimanager.domain.model.AppError
 import dev.autorasqr.xuimanager.domain.model.AppException
@@ -22,7 +23,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -51,13 +51,13 @@ class RoutingRepositoryImpl @Inject constructor(
         )
     }
 
-    override suspend fun setClientRouting(serverId: Long, profile: ClientRouting) = ioMapped {
+    override suspend fun setClientRouting(serverId: Long, profile: ClientRouting): Unit = ioMapped {
         val api = panels.forServer(serverId).second
         requireRouting(api)
         api.patchSettings(RoscomVpn.subscriptionSettings(profile))
         // The subscription server reads its settings when the panel starts.
         api.restartPanel()
-        waitForPanel(api)
+        api.awaitOnline()
     }
 
     override fun serverBlockProgress(serverId: Long): StateFlow<RoutingJobProgress?> = flowFor(serverId)
@@ -119,24 +119,6 @@ class RoutingRepositoryImpl @Inject constructor(
 
     private fun requireRouting(api: PanelApi) {
         if (!api.capabilities.routing) throw AppException(AppError.UnsupportedPanelVersion("2.x"))
-    }
-
-    private suspend fun waitForPanel(api: PanelApi) {
-        delay(3_000)
-        val deadline = System.currentTimeMillis() + 60_000
-        var last: Exception? = null
-        while (System.currentTimeMillis() < deadline) {
-            try {
-                api.status()
-                return
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                last = e
-            }
-            delay(2_000)
-        }
-        throw last ?: AppException(AppError.PanelStartFailed)
     }
 
     private fun flowFor(serverId: Long) = progress.getOrPut(serverId) { MutableStateFlow(null) }

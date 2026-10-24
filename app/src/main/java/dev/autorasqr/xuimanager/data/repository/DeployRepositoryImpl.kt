@@ -12,6 +12,7 @@ import dev.autorasqr.xuimanager.data.deploy.DeployProgressRegistry
 import dev.autorasqr.xuimanager.data.deploy.Fingerprints
 import dev.autorasqr.xuimanager.data.deploy.PrecheckParser
 import dev.autorasqr.xuimanager.data.deploy.RandomTokens
+import dev.autorasqr.xuimanager.data.deploy.SitePageStore
 import dev.autorasqr.xuimanager.data.deploy.StoredDeployParams
 import dev.autorasqr.xuimanager.data.panel.PanelVersion
 import dev.autorasqr.xuimanager.data.secure.SecretKeys
@@ -53,6 +54,7 @@ class DeployRepositoryImpl @Inject constructor(
     private val registry: DeployProgressRegistry,
     private val random: RandomTokens,
     private val launcher: DeployLauncher,
+    private val sitePages: SitePageStore,
     private val json: Json,
 ) : DeployRepository {
 
@@ -146,6 +148,7 @@ class DeployRepositoryImpl @Inject constructor(
         )
         secrets.put(SecretKeys.jobPanelPassword(jobId), random.alphanumeric(24))
         secrets.put(SecretKeys.jobWebBasePath(jobId), random.alphanumeric(18))
+        if (params.selfSteal) options.sitePage?.let { sitePages.put(jobId, it) }
         launcher.start(jobId)
         return jobId
     }

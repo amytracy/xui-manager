@@ -27,7 +27,6 @@ import dev.autorasqr.xuimanager.domain.model.InboundTransport
 import dev.autorasqr.xuimanager.domain.model.InboundsSnapshot
 import dev.autorasqr.xuimanager.domain.model.NodeChoice
 import dev.autorasqr.xuimanager.domain.model.NodeStatus
-import dev.autorasqr.xuimanager.domain.model.RealityDraft
 import dev.autorasqr.xuimanager.domain.model.RealityView
 import dev.autorasqr.xuimanager.domain.model.SelfStealAction
 import dev.autorasqr.xuimanager.domain.model.SelfStealIssue
@@ -87,25 +86,6 @@ class InboundRepositoryImpl @Inject constructor(
         if (server.panel?.defaultInboundId == inboundId) updatePanel(serverId) { it.copy(defaultInboundId = null) }
     }
 
-    override suspend fun createReality(serverId: Long, draft: RealityDraft): Int = ioMapped {
-        val (server, api) = panels.forServer(serverId)
-        val sni = validateSni(draft.sni)
-        val host = hostOf(serverId, server, draft.nodeId)
-        validatePort(host.sshPort, api, draft.port, draft.nodeId, exceptId = null)
-        val request = InboundRequest(
-            remark = draft.remark.trim().ifEmpty { "reality-${draft.port}" },
-            protocol = InboundProtocol.VLESS,
-            transport = InboundTransport.TCP,
-            port = draft.port,
-            sni = sni,
-            fingerprint = fingerprint(draft.fingerprint),
-            nodeId = draft.nodeId,
-        )
-        val created = factory.create(api, request, serverKeys = null, scanner = host.scanner ?: api) {}
-        api.restartXray()
-        created.id
-    }
-
     override suspend fun updateReality(serverId: Long, inboundId: Int, sni: String, fingerprint: String) = ioMapped {
         val api = panels.forServer(serverId).second
         val host = validateSni(sni)
@@ -115,8 +95,8 @@ class InboundRepositoryImpl @Inject constructor(
     }
 
     override suspend fun checkSni(serverId: Long, host: String, nodeId: Int?): SniCheck? = ioMapped {
-        val (server, master) = panels.forServer(serverId)
-        val api = hostOf(serverId, server, nodeId).scanner ?: master
+        val master = panels.forServer(serverId).second
+        val api = nodeScanner(serverId, nodeId) ?: master
         if (!api.capabilities.realityScan) return@ioMapped null
         val name = validateSni(host)
         val verdict = factory.scan(api, listOf(name)) {}.firstOrNull()
@@ -129,11 +109,11 @@ class InboundRepositoryImpl @Inject constructor(
         flowFor(serverId).update { if (it?.state == DeployState.RUNNING) it else null }
     }
 
-    override fun installSelfSteal(serverId: Long, convertInboundId: Int?, fingerprint: String) =
+    override fun installSelfSteal(serverId: Long, convertInboundId: Int?, fingerprint: String, sitePage: ByteArray?) =
         startSelfSteal(serverId, SelfStealAction.INSTALL) { log ->
             val server = serverDao.get(serverId)?.toDomain() ?: throw AppException(AppError.Unexpected("server not found"))
             val domain = server.domain ?: throw AppException(AppError.SelfStealFailed(SelfStealIssue.NO_DOMAIN))
-            val port = runSelfStealScript(server, "install", domain, log)
+            val port = runSelfStealScript(server, "install", domain, log, sitePage)
                 ?: throw AppException(AppError.Unexpected("result.env has no SELFSTEAL_PORT"))
             updatePanel(serverId) { it.copy(selfstealPort = port) }
 
@@ -168,6 +148,15 @@ class InboundRepositoryImpl @Inject constructor(
             inboundId
         }
 
+    override fun updateSitePage(serverId: Long, sitePage: ByteArray?) =
+        startSelfSteal(serverId, SelfStealAction.PAGE) { log ->
+            val server = serverDao.get(serverId)?.toDomain() ?: throw AppException(AppError.Unexpected("server not found"))
+            val domain = server.domain ?: throw AppException(AppError.SelfStealFailed(SelfStealIssue.NO_DOMAIN))
+            runSelfStealScript(server, "page", domain, log, sitePage)
+            log(if (sitePage != null) "Your page is on the decoy site" else "The decoy site has a new random page")
+            null
+        }
+
     override fun removeSelfSteal(serverId: Long) =
         startSelfSteal(serverId, SelfStealAction.REMOVE) { log ->
             val server = serverDao.get(serverId)?.toDomain() ?: throw AppException(AppError.Unexpected("server not found"))
@@ -196,7 +185,13 @@ class InboundRepositoryImpl @Inject constructor(
     }
 
     /** Runs selfsteal.sh as root on the server and returns SELFSTEAL_PORT from its result. */
-    private suspend fun runSelfStealScript(server: Server, action: String, domain: String, log: (String) -> Unit): Int? =
+    private suspend fun runSelfStealScript(
+        server: Server,
+        action: String,
+        domain: String,
+        log: (String) -> Unit,
+        sitePage: ByteArray? = null,
+    ): Int? =
         scripts.run(
             server = server,
             script = "selfsteal.sh",
@@ -204,6 +199,7 @@ class InboundRepositoryImpl @Inject constructor(
             timeoutMs = DeployConfig.SELFSTEAL_TIMEOUT_MS,
             params = { RemoteJob.selfStealEnv(action, domain, it.uid, it.gid) },
             log = log,
+            extraFiles = sitePage?.let { mapOf(DeployConfig.SITE_PAGE_FILE to it) }.orEmpty(),
         )["SELFSTEAL_PORT"]?.toIntOrNull()
 
     private suspend fun updatePanel(serverId: Long, change: (PanelEmbedded) -> PanelEmbedded) {
@@ -220,20 +216,11 @@ class InboundRepositoryImpl @Inject constructor(
         return host
     }
 
-    /** Ports are per machine: only inbounds on the same host (the panel's server or one node) can collide. */
-    private suspend fun validatePort(sshPort: Int?, api: PanelApi, port: Int, nodeId: Int?, exceptId: Int?) {
-        if (port !in 1..65535 || port == sshPort) throw AppException(AppError.Validation(ValidationField.INBOUND_PORT))
-        if (api.listInbounds().any { it.port == port && it.nodeId == nodeId && it.id != exceptId }) throw AppException(AppError.PortBusy(port))
-    }
-
-    /** The machine an inbound goes to; for a node the app deployed, its own panel and SSH port. */
-    private class Host(val sshPort: Int?, val scanner: PanelApi?)
-
-    private suspend fun hostOf(serverId: Long, server: Server, nodeId: Int?): Host {
-        if (nodeId == null) return Host(server.sshPort, null)
-        val own = serverDao.nodesOf(serverId).firstOrNull { it.nodeId == nodeId && it.panel != null } ?: return Host(null, null)
-        val scanner = runCatching { panels.forServer(own.id).second }.getOrNull()
-        return Host(own.sshPort, scanner)
+    /** For a node the app deployed, its own panel, so Reality targets are probed from the node itself. */
+    private suspend fun nodeScanner(serverId: Long, nodeId: Int?): PanelApi? {
+        if (nodeId == null) return null
+        val own = serverDao.nodesOf(serverId).firstOrNull { it.nodeId == nodeId && it.panel != null } ?: return null
+        return runCatching { panels.forServer(own.id).second }.getOrNull()
     }
 
     private suspend fun nodeChoices(serverId: Long, api: PanelApi): List<NodeChoice> {

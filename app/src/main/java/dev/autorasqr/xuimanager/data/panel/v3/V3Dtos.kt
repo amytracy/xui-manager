@@ -109,3 +109,18 @@ internal data class V3NodeProbe(
 
 @Serializable
 internal data class V3RemoteInbound(val tag: String = "", val remark: String = "", val protocol: String = "", val port: Int = 0)
+
+/** PanelUpdateInfo from /server/getPanelUpdateInfo. */
+@Serializable
+internal data class V3PanelUpdateInfo(
+    val currentVersion: String = "",
+    val latestVersion: String = "",
+    val updateAvailable: Boolean = false,
+)
+
+/** PanelUpdateStatus from /server/getUpdateStatus; runId is a decimal string. */
+@Serializable
+internal data class V3PanelUpdateStatus(val runId: String = "", val state: String = "", val exitCode: Int = 0)
+
+@Serializable
+internal data class V3NodeUpdateResult(val id: Int = 0, val name: String = "", val ok: Boolean = false, val error: String = "")

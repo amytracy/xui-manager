@@ -5,7 +5,7 @@
 #   Caddy (pinned release, checked by SHA-256) runs as xui-caddy and listens on 127.0.0.1 only: port 80 stays free
 #   for acme.sh renewals, and nothing new is exposed to the internet.
 #
-# Standalone: started like run.sh with params.env (ACTION=install|remove, DOMAIN, OWNER_UID, OWNER_GID, CADDY_*),
+# Standalone: started like run.sh with params.env (ACTION=install|page|remove, DOMAIN, OWNER_UID, OWNER_GID, CADDY_*),
 #   talks through log/stage/exit and writes result.env with SELFSTEAL_PORT.
 # Library: run.sh sources it with SELFSTEAL_LIB=1 and calls selfsteal_install after the panel certificate is in place.
 
@@ -135,22 +135,28 @@ ss_brand() {
     printf '%s%s' "$first" "${label:1}"
 }
 
+# ss_site: the user's own page when the app uploaded site.html next to the script, a random template otherwise.
 ss_site() {
-    local brand accent year template
-    brand=$(ss_brand)
-    accent=$(ss_pick "#2563eb" "#0d9488" "#7c3aed" "#db2777" "#ea580c" "#16a34a" "#0891b2" "#4f46e5")
-    year=$(date +%Y)
-    template=$(ss_pick cloud studio notes)
     mkdir -p "$SS_WWW"
-    case "$template" in
-        cloud) ss_site_cloud "$brand" "$accent" "$year" ;;
-        studio) ss_site_studio "$brand" "$accent" "$year" ;;
-        *) ss_site_notes "$brand" "$accent" "$year" ;;
-    esac > "$SS_WWW/index.html"
+    if [ -s "$JOB_DIR/site.html" ]; then
+        cp -f "$JOB_DIR/site.html" "$SS_WWW/index.html.new" && mv -f "$SS_WWW/index.html.new" "$SS_WWW/index.html"
+        log "Custom decoy page installed"
+    else
+        local brand accent year template
+        brand=$(ss_brand)
+        accent=$(ss_pick "#2563eb" "#0d9488" "#7c3aed" "#db2777" "#ea580c" "#16a34a" "#0891b2" "#4f46e5")
+        year=$(date +%Y)
+        template=$(ss_pick cloud studio notes)
+        case "$template" in
+            cloud) ss_site_cloud "$brand" "$accent" "$year" ;;
+            studio) ss_site_studio "$brand" "$accent" "$year" ;;
+            *) ss_site_notes "$brand" "$accent" "$year" ;;
+        esac > "$SS_WWW/index.html"
+        log "Decoy site generated ($template template)"
+    fi
     printf 'User-agent: *\nAllow: /\n' > "$SS_WWW/robots.txt"
     chmod 755 "$SS_WWW"
     chmod 644 "$SS_WWW/index.html" "$SS_WWW/robots.txt"
-    log "Decoy site generated ($template template)"
 }
 
 ss_site_cloud() {
@@ -415,6 +421,11 @@ if [ "${SELFSTEAL_LIB:-0}" != 1 ]; then
             )
             own "$JOB_DIR/result.env.tmp"
             mv -f "$JOB_DIR/result.env.tmp" "$JOB_DIR/result.env"
+            ;;
+        page)
+            # Only the page changes: Caddy serves files from disk, so the running site picks it up as is.
+            [ -f "$SS_ETC/Caddyfile" ] || fail E_SELFSTEAL "the decoy site is not installed"
+            ss_site
             ;;
         remove)
             selfsteal_remove

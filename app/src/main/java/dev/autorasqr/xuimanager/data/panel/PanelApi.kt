@@ -109,6 +109,20 @@ interface PanelApi {
 
     /** The node's own panel certificate and key paths, for TLS inbounds hosted on it. */
     suspend fun nodeWebCert(id: Int): Pair<String, String>? = unsupported()
+
+    /** Asks the nodes to run the official updater; only enabled, online nodes accept. */
+    suspend fun updateNodePanels(ids: List<Int>): List<NodeUpdateResult> = unsupported()
+
+    // --- panel self-update (3x-ui v3, see [PanelCapabilities.selfUpdate]) ---
+
+    /** Fails when the panel can't reach GitHub. */
+    suspend fun panelUpdateInfo(): PanelUpdateInfo = unsupported()
+
+    /** Starts the official updater detached; the panel restarts when it finishes. Returns the run id. */
+    suspend fun startPanelUpdate(): String = unsupported()
+
+    /** Outcome of the latest run; compare its runId with the one [startPanelUpdate] returned. */
+    suspend fun panelUpdateStatus(): PanelUpdateRun = unsupported()
 }
 
 data class VlessEncAuth(val id: String, val label: String, val decryption: String, val encryption: String)

@@ -43,6 +43,12 @@ object RemoteJob {
         "OWNER_GID" to gid.toString(),
     )
 
+    /** params.env for sysupdate.sh. */
+    fun sysUpdateEnv(uid: Int, gid: Int): String = env(
+        "OWNER_UID" to uid.toString(),
+        "OWNER_GID" to gid.toString(),
+    )
+
     private fun caddyEnv() = arrayOf(
         "CADDY_VERSION" to DeployConfig.CADDY_VERSION,
         "CADDY_SHA256_AMD64" to DeployConfig.CADDY_SHA256_AMD64,
@@ -85,7 +91,7 @@ object RemoteJob {
 
     /** Removes everything secret; the masked log is kept for troubleshooting. */
     fun cleanupCommand(jobDir: String): String =
-        "cd ${shQuote(jobDir)} && rm -rf result.env result.env.tmp x25519.out secrets.env install.sh caddy.tar.gz caddy"
+        "cd ${shQuote(jobDir)} && rm -rf result.env result.env.tmp x25519.out secrets.env site.html install.sh caddy.tar.gz caddy"
 
     private fun env(vararg pairs: Pair<String, String>): String = buildString {
         pairs.forEach { (key, value) ->

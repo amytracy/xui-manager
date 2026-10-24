@@ -70,6 +70,18 @@ object PanelVersion {
 
     fun major(version: String): Int? = parse(version).firstOrNull()
 
+    /** Compares release numbers part by part (missing parts count as 0); null if either can't be parsed. */
+    fun compare(a: String, b: String): Int? {
+        val left = parse(a)
+        val right = parse(b)
+        if (left.isEmpty() || right.isEmpty()) return null
+        for (i in 0 until maxOf(left.size, right.size)) {
+            val diff = (left.getOrNull(i) ?: 0).compareTo(right.getOrNull(i) ?: 0)
+            if (diff != 0) return diff
+        }
+        return 0
+    }
+
     fun normalize(version: String): String {
         val parts = parse(version)
         return if (parts.isEmpty()) version.trim() else "v" + parts.joinToString(".")

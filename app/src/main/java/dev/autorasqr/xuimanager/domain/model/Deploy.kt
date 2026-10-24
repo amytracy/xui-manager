@@ -36,6 +36,8 @@ data class DeployOptions(
     val fingerprint: String = DEFAULT_FINGERPRINT,
     /** One-click on a server with a domain: Reality borrows the server's own decoy site. */
     val selfSteal: Boolean = false,
+    /** The user's own index.html for the decoy site; null picks a random template. */
+    val sitePage: ByteArray? = null,
     /** Hand the RoscomVPN routing profile to Happ/INCY so RU/BY traffic goes direct (3x-ui v3). */
     val clientRouting: Boolean = true,
 )

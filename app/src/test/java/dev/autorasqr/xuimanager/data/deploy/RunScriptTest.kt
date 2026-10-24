@@ -413,6 +413,64 @@ INSTALLER""",
     }
 
     @Test
+    fun `deploy with self-steal serves the user's own page`() {
+        installFakes(DeployConfig.INSTALLER_SHA256)
+        fakeCaddyRelease()
+        File(root, "fake-x-ui").writeText(fakeXui("3.10.2", withTokens = true))
+        writeJob(action = null, host = "vpn.example.com", selfSteal = true)
+        File(jobDir, DeployConfig.SITE_PAGE_FILE).writeText(OWN_PAGE)
+
+        assertEquals(0, run())
+        assertEquals("0", File(jobDir, "exit").readText())
+        assertEquals(OWN_PAGE, File(ssWww, "index.html").readText())
+        assertTrue(File(jobDir, "log").readText().contains("Custom decoy page installed"))
+    }
+
+    @Test
+    fun `the page of an installed decoy site can be replaced and reset to a template`() {
+        installFakes(DeployConfig.INSTALLER_SHA256)
+        fakeCaddyRelease()
+        File(certRoot, "vpn.example.com").mkdirs()
+        File(certRoot, "vpn.example.com/fullchain.pem").writeText("chain")
+        File(certRoot, "vpn.example.com/privkey.pem").writeText("key")
+        trusted.writeText("")
+        copyScripts()
+        val page = File(jobDir, DeployConfig.SITE_PAGE_FILE).apply { writeText(OWN_PAGE) }
+        File(jobDir, "params.env").writeText(RemoteJob.selfStealEnv("install", "vpn.example.com", 0, 0))
+        assertEquals(0, run("selfsteal.sh"))
+        assertEquals(OWN_PAGE, File(ssWww, "index.html").readText())
+
+        File(jobDir, "exit").delete()
+        page.writeText("<!doctype html><title>second</title>")
+        File(jobDir, "params.env").writeText(RemoteJob.selfStealEnv("page", "vpn.example.com", 0, 0))
+        val callsBefore = calls.readText()
+        assertEquals(0, run("selfsteal.sh"))
+        assertEquals("0", File(jobDir, "exit").readText())
+        assertEquals("<!doctype html><title>second</title>", File(ssWww, "index.html").readText())
+        val pageCalls = calls.readText().removePrefix(callsBefore)
+        assertFalse("Caddy and the certificate stay as they are", pageCalls.contains("xui-caddy") || pageCalls.contains("acme"))
+
+        File(jobDir, "exit").delete()
+        page.delete()
+        assertEquals(0, run("selfsteal.sh"))
+        assertEquals("0", File(jobDir, "exit").readText())
+        val site = File(ssWww, "index.html").readText()
+        assertTrue("a random template is back", site.contains("Example"))
+    }
+
+    @Test
+    fun `changing the page needs an installed decoy site`() {
+        installFakes(DeployConfig.INSTALLER_SHA256)
+        copyScripts()
+        File(jobDir, DeployConfig.SITE_PAGE_FILE).writeText(OWN_PAGE)
+        File(jobDir, "params.env").writeText(RemoteJob.selfStealEnv("page", "vpn.example.com", 0, 0))
+
+        assertEquals(1, run("selfsteal.sh"))
+        assertEquals("E_SELFSTEAL", File(jobDir, "exit").readText())
+        assertFalse(File(ssWww, "index.html").exists())
+    }
+
+    @Test
     fun `a tampered Caddy archive is refused`() {
         installFakes(DeployConfig.INSTALLER_SHA256)
         fakeCaddyRelease()
@@ -496,3 +554,5 @@ INSTALLER""",
         assertFalse(File(ssUnits, "xui-roscomvpn-geodata.timer").exists())
     }
 }
+
+private const val OWN_PAGE = "<!DOCTYPE html>\n<html><body><h1>My own page</h1></body></html>\n"

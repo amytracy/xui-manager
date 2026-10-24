@@ -66,23 +66,14 @@ data class InboundsSnapshot(
     val domain: String?,
     /** Local port of the self-steal site when it is set up. */
     val selfStealPort: Int?,
-    /** Nodes a new inbound can be placed on (3x-ui v3); empty without nodes. */
+    /** Nodes of the panel (3x-ui v3); empty without nodes. */
     val nodes: List<NodeChoice> = emptyList(),
-)
-
-/** Quick VLESS + TCP + Reality inbound. */
-data class RealityDraft(
-    val remark: String,
-    val port: Int,
-    val sni: String,
-    val fingerprint: String,
-    /** Node to place the inbound on; null for the panel's own server. */
-    val nodeId: Int? = null,
 )
 
 data class SniCheck(val host: String, val usable: Boolean, val latencyMs: Long)
 
-enum class SelfStealAction { INSTALL, REMOVE }
+/** [PAGE] replaces only the decoy site's page; Caddy and the inbounds stay as they are. */
+enum class SelfStealAction { INSTALL, PAGE, REMOVE }
 
 data class SelfStealProgress(
     val action: SelfStealAction,

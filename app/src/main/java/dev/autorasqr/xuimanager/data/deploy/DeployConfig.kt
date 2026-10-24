@@ -17,10 +17,14 @@ object DeployConfig {
     const val CADDY_SHA256_AMD64 = "727b91701a392de6ebc5027509f548bf39979e5216340d0faed8fa5e69c84f8b"
     const val CADDY_SHA256_ARM64 = "d8fc6d179a5d283028a472a5618564f6ad8a86fed513e64f032b3b0b7cc45e42"
     const val SELFSTEAL_TIMEOUT_MS = 15 * 60_000L
+    /** The user's own decoy page, uploaded next to selfsteal.sh; without it the script picks a random template. */
+    const val SITE_PAGE_FILE = "site.html"
 
     /** Scripts uploaded next to each other into a job directory. */
     val SCRIPTS = listOf("run.sh", "lib.sh", "selfsteal.sh")
     const val GEODATA_TIMEOUT_MS = 10 * 60_000L
+    /** apt may first wait up to 10 min for unattended-upgrades to release its lock. */
+    const val SYSUPDATE_TIMEOUT_MS = 40 * 60_000L
 
     const val POLL_INTERVAL_MS = 1_500L
     const val MAX_LOG_LINES = 3_000

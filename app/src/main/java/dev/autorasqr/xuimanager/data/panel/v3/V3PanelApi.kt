@@ -6,6 +6,7 @@ import dev.autorasqr.xuimanager.data.panel.InboundSpec
 import dev.autorasqr.xuimanager.data.panel.NewClient
 import dev.autorasqr.xuimanager.data.panel.NodeMutation
 import dev.autorasqr.xuimanager.data.panel.NodeProbe
+import dev.autorasqr.xuimanager.data.panel.NodeUpdateResult
 import dev.autorasqr.xuimanager.data.panel.PanelApi
 import dev.autorasqr.xuimanager.data.panel.PanelCapabilities
 import dev.autorasqr.xuimanager.data.panel.PanelClient
@@ -16,6 +17,8 @@ import dev.autorasqr.xuimanager.data.panel.PanelJson.bool
 import dev.autorasqr.xuimanager.data.panel.PanelJson.int
 import dev.autorasqr.xuimanager.data.panel.PanelJson.string
 import dev.autorasqr.xuimanager.data.panel.PanelStatus
+import dev.autorasqr.xuimanager.data.panel.PanelUpdateInfo
+import dev.autorasqr.xuimanager.data.panel.PanelUpdateRun
 import dev.autorasqr.xuimanager.data.panel.RealityTargetVerdict
 import dev.autorasqr.xuimanager.data.panel.RemoteInboundOption
 import dev.autorasqr.xuimanager.data.panel.SubscriptionSettings
@@ -43,7 +46,7 @@ internal class V3PanelApi(
     private val json: Json,
 ) : PanelApi {
 
-    override val capabilities = PanelCapabilities(multiInboundClients = true, realityScan = true, routing = true, nodes = true)
+    override val capabilities = PanelCapabilities(multiInboundClients = true, realityScan = true, routing = true, nodes = true, selfUpdate = true)
 
     override suspend fun status(): PanelStatus {
         val dto = PanelJson.decode<V3Status>(json, call { service.status() })
@@ -300,6 +303,30 @@ internal class V3PanelApi(
         val cert = obj.string("webCertFile").orEmpty()
         val key = obj.string("webKeyFile").orEmpty()
         return if (cert.isBlank() || key.isBlank()) null else cert to key
+    }
+
+    override suspend fun updateNodePanels(ids: List<Int>): List<NodeUpdateResult> {
+        val body = buildJsonObject {
+            putJsonArray("ids") { ids.forEach { add(JsonPrimitive(it)) } }
+            put("dev", false)
+        }
+        return PanelJson.decode<List<V3NodeUpdateResult>?>(json, call { service.updateNodePanels(body) }).orEmpty()
+            .map { NodeUpdateResult(it.id, it.name, it.ok, it.error) }
+    }
+
+    override suspend fun panelUpdateInfo(): PanelUpdateInfo {
+        val dto = PanelJson.decode<V3PanelUpdateInfo?>(json, call { service.panelUpdateInfo() })
+            ?: throw AppException(AppError.PanelError("empty update info"))
+        return PanelUpdateInfo(dto.currentVersion, dto.latestVersion, dto.updateAvailable)
+    }
+
+    override suspend fun startPanelUpdate(): String =
+        PanelJson.objectOrNull(json, call { service.updatePanel() })?.string("runId")?.takeIf { it.isNotBlank() }
+            ?: throw AppException(AppError.PanelError("the panel did not start the update"))
+
+    override suspend fun panelUpdateStatus(): PanelUpdateRun {
+        val dto = PanelJson.decode<V3PanelUpdateStatus?>(json, call { service.updateStatus() }) ?: V3PanelUpdateStatus()
+        return PanelUpdateRun(dto.runId, dto.state.ifBlank { "pending" }, dto.exitCode)
     }
 
     private suspend fun allSettings(): JsonObject =

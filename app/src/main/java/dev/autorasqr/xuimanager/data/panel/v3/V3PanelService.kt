@@ -163,4 +163,18 @@ interface V3PanelService {
 
     @GET("panel/api/nodes/webCert/{id}")
     suspend fun nodeWebCert(@Path("id") id: Int): ResponseBody
+
+    /** Body {ids: [...], dev: false}; obj is a per-node result list. */
+    @POST("panel/api/nodes/updatePanel")
+    suspend fun updateNodePanels(@Body body: JsonObject): ResponseBody
+
+    @GET("panel/api/server/getPanelUpdateInfo")
+    suspend fun panelUpdateInfo(): ResponseBody
+
+    /** Without a dev field the panel uses its configured (stable) channel; obj is {runId}. */
+    @POST("panel/api/server/updatePanel")
+    suspend fun updatePanel(): ResponseBody
+
+    @GET("panel/api/server/getUpdateStatus")
+    suspend fun updateStatus(): ResponseBody
 }

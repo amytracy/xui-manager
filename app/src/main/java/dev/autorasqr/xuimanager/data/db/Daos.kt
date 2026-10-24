@@ -36,6 +36,9 @@ interface ServerDao {
     @Query("UPDATE servers SET nodeId = :nodeId, updatedAt = :now WHERE id = :id")
     suspend fun updateNodeId(id: Long, nodeId: Int?, now: Long)
 
+    @Query("UPDATE servers SET panel_version = :version, updatedAt = :now WHERE id = :id")
+    suspend fun updatePanelVersion(id: Long, version: String, now: Long)
+
     @Query("DELETE FROM servers WHERE id = :id")
     suspend fun delete(id: Long)
 }

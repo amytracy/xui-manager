@@ -37,6 +37,8 @@ data class PanelCapabilities(
     val routing: Boolean = false,
     /** v3 manages other 3x-ui panels as nodes (/panel/api/nodes) and can host inbounds on them. */
     val nodes: Boolean = false,
+    /** v3 checks GitHub for a newer release and runs the official updater on itself and on its nodes. */
+    val selfUpdate: Boolean = false,
 )
 
 /** The panel's Xray config template and the outbound test URL saved alongside it. */
@@ -269,3 +271,12 @@ data class NodeProbe(
 
 /** An inbound on a node, offered for selective sync. */
 data class RemoteInboundOption(val tag: String, val remark: String, val protocol: String, val port: Int)
+
+/** getPanelUpdateInfo: the running and the latest stable release as the panel sees them on GitHub. */
+data class PanelUpdateInfo(val currentVersion: String, val latestVersion: String, val updateAvailable: Boolean)
+
+/** getUpdateStatus: the outcome of the latest self-update; [state] is pending, success or failed. */
+data class PanelUpdateRun(val runId: String, val state: String, val exitCode: Int)
+
+/** One entry of /nodes/updatePanel: whether the node accepted the update request. */
+data class NodeUpdateResult(val id: Int, val name: String, val ok: Boolean, val error: String)

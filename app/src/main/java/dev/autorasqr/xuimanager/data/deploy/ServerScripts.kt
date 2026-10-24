@@ -24,6 +24,7 @@ class ServerScripts @Inject constructor(
     /**
      * Uploads lib.sh and [script] with the params.env [params] builds from the precheck, runs it and returns the
      * values of its result.env (empty if it writes none). A non-zero exit becomes the matching AppException.
+     * [extraFiles] are uploaded into the job directory next to the script.
      */
     suspend fun run(
         server: Server,
@@ -32,13 +33,14 @@ class ServerScripts @Inject constructor(
         timeoutMs: Long,
         params: (PrecheckResult) -> String,
         log: (String) -> Unit,
+        extraFiles: Map<String, ByteArray> = emptyMap(),
     ): Map<String, String> {
         log("Checking the server" + if (checkDomain && server.domain != null) " and that ${server.domain} points at it" else "")
         val precheck = deployRepository.precheck(server.id, checkDomain)
         val target = targets.forServer(server)
         val jobDir = RemoteJob.jobDir(precheck.home, System.currentTimeMillis())
         val files = listOf("lib.sh", script).associateWith { name -> context.assets.open("deploy/$name").use { it.readBytes() } } +
-            ("params.env" to params(precheck).toByteArray())
+            extraFiles + ("params.env" to params(precheck).toByteArray())
         val launchedAt = System.currentTimeMillis()
         ssh.withSession(target) { session -> runner.launch(session, jobDir, files, script, precheck.sudo) }
         log("Started on the server")

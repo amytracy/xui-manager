@@ -180,6 +180,7 @@ object DeployExitCodes {
             "E_CADDY_HASH" -> AppError.SelfStealFailed(SelfStealIssue.CHECKSUM)
             "E_SELFSTEAL" -> AppError.SelfStealFailed(SelfStealIssue.SETUP)
             "E_GEODATA" -> AppError.GeodataFailed
+            "E_SYSUPDATE" -> AppError.SystemUpdateFailed(detail)
             else -> AppError.Unexpected(code)
         }
     }

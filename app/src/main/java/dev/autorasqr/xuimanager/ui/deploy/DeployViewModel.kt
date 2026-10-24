@@ -1,5 +1,7 @@
 package dev.autorasqr.xuimanager.ui.deploy
 
+import android.content.ContentResolver
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,7 +24,9 @@ import dev.autorasqr.xuimanager.domain.model.ValidationField
 import dev.autorasqr.xuimanager.domain.repository.DeployRepository
 import dev.autorasqr.xuimanager.domain.repository.ServerRepository
 import dev.autorasqr.xuimanager.domain.usecase.InboundMatrix
+import dev.autorasqr.xuimanager.ui.common.SitePageChoice
 import dev.autorasqr.xuimanager.ui.common.asAppError
+import dev.autorasqr.xuimanager.ui.common.readSitePage
 import dev.autorasqr.xuimanager.ui.navigation.DeployRoute
 import dev.autorasqr.xuimanager.ui.servers.HostKeyPrompt
 import kotlinx.coroutines.CancellationException
@@ -43,6 +47,8 @@ data class DeployUiState(
     val fingerprint: String = DEFAULT_FINGERPRINT,
     /** One-click on a server with a domain: borrow the server's own decoy site instead of someone else's. */
     val selfSteal: Boolean = true,
+    /** The user's own decoy page for self-steal; empty picks a random template. */
+    val sitePage: SitePageChoice = SitePageChoice(),
     /** RoscomVPN routing profile in the subscription (RU/BY direct in Happ and INCY). */
     val clientRouting: Boolean = true,
     val manual: ManualForm = ManualForm(),
@@ -93,6 +99,15 @@ class DeployViewModel @Inject constructor(
     fun onSni(value: String?) = _state.update { it.copy(sni = value) }
     fun onFingerprint(value: String) = _state.update { it.copy(fingerprint = value) }
     fun onSelfSteal(value: Boolean) = _state.update { it.copy(selfSteal = value) }
+
+    fun onSitePage(resolver: ContentResolver, uri: Uri) {
+        viewModelScope.launch {
+            val page = readSitePage(resolver, uri)
+            _state.update { it.copy(sitePage = page) }
+        }
+    }
+
+    fun resetSitePage() = _state.update { it.copy(sitePage = SitePageChoice()) }
     fun onClientRouting(value: Boolean) = _state.update { it.copy(clientRouting = value) }
     fun onMode(value: DeployMode) = _state.update { it.copy(mode = value, error = null) }
 
@@ -187,6 +202,7 @@ class DeployViewModel @Inject constructor(
             manual = current.manual.toConfig().takeIf { current.mode == DeployMode.MANUAL && action != ExistingInstallAction.ADOPT },
             fingerprint = current.fingerprint,
             selfSteal = current.selfSteal && current.server?.domain != null,
+            sitePage = current.sitePage.bytes,
             clientRouting = current.clientRouting && current.server?.isNode != true,
         )
         val jobId = deployRepository.startDeploy(serverId, options, precheck)

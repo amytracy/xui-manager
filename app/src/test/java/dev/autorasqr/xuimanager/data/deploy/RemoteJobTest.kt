@@ -47,6 +47,11 @@ class RemoteJobTest {
         assertEquals("/home/u/.xui-manager/jobs/7", RemoteJob.jobDir("/home/u/", 7))
     }
 
+    @Test
+    fun `cleanup removes the uploaded decoy page with the other job files`() {
+        assertTrue(RemoteJob.cleanupCommand("/root/job").contains(" ${DeployConfig.SITE_PAGE_FILE} "))
+    }
+
     /** Runs the real snippets with the local /bin/sh against a fake job directory. */
     @Test
     fun `prepare and poll commands work in a POSIX shell`() {

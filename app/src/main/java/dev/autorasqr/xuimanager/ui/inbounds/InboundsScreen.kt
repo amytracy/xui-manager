@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -35,7 +34,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -60,7 +58,6 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -68,16 +65,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.autorasqr.xuimanager.R
 import dev.autorasqr.xuimanager.domain.model.DeployState
 import dev.autorasqr.xuimanager.domain.model.InboundItem
-import dev.autorasqr.xuimanager.domain.model.NodeChoice
 import dev.autorasqr.xuimanager.domain.model.SelfStealAction
 import dev.autorasqr.xuimanager.domain.model.SelfStealProgress
 import dev.autorasqr.xuimanager.domain.model.ValidationField
 import dev.autorasqr.xuimanager.ui.common.FingerprintField
 import dev.autorasqr.xuimanager.ui.common.Formatters
-import dev.autorasqr.xuimanager.ui.common.SelectField
+import dev.autorasqr.xuimanager.ui.common.SitePageChoice
+import dev.autorasqr.xuimanager.ui.common.SitePageField
 import dev.autorasqr.xuimanager.ui.common.SniField
 import dev.autorasqr.xuimanager.ui.common.message
-import dev.autorasqr.xuimanager.ui.common.messageRes
 import dev.autorasqr.xuimanager.ui.theme.LocalStatusColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -159,6 +155,14 @@ fun InboundsScreen(
                     state.selfSteal?.let { progress ->
                         item(key = "selfsteal") { SelfStealProgressCard(progress, onDismiss = viewModel::dismissSelfStealProgress) }
                     }
+                    // The app may not know the site's port (adopted panel, older app version), but a self-steal inbound
+                    // means the site is there; the script refuses a server without one anyway.
+                    val siteInstalled = snapshot.selfStealPort != null || snapshot.items.any { it.selfSteal }
+                    if (siteInstalled && snapshot.domain != null) {
+                        item(key = "decoy") {
+                            DecoySiteCard(snapshot.domain, enabled = !viewModel.selfStealRunning, onChangePage = viewModel::openSitePage)
+                        }
+                    }
                     state.error?.let { error ->
                         item(key = "error") { Text(error.message(), color = MaterialTheme.colorScheme.error) }
                     }
@@ -180,6 +184,7 @@ fun InboundsScreen(
                             onEdit = { viewModel.openEditReality(item) },
                             onAdvanced = { onEditor(item.id) },
                             onDelete = { viewModel.requestDelete(item) },
+                            onSitePage = if (item.selfSteal && snapshot.domain != null && !viewModel.selfStealRunning) viewModel::openSitePage else null,
                         )
                     }
                 }
@@ -191,17 +196,19 @@ fun InboundsScreen(
         AddInboundDialog(
             hasDomain = state.snapshot?.domain != null,
             selfStealRunning = viewModel.selfStealRunning,
-            onReality = viewModel::openCreateReality,
             onSelfSteal = viewModel::openSelfSteal,
             onAdvanced = { viewModel.closeAddMenu(); onEditor(null) },
             onDismiss = viewModel::closeAddMenu,
         )
     }
     state.realityForm?.let { form ->
-        RealityFormDialog(form, canCheck = state.snapshot?.canCheckSni == true, nodes = state.snapshot?.nodes.orEmpty(), viewModel = viewModel)
+        RealityFormDialog(form, canCheck = state.snapshot?.canCheckSni == true, viewModel = viewModel)
     }
     state.selfStealForm?.let { form ->
         SelfStealDialog(form, domain = state.snapshot?.domain.orEmpty(), viewModel = viewModel)
+    }
+    state.sitePageForm?.let { page ->
+        SitePageDialog(page, domain = state.snapshot?.domain.orEmpty(), viewModel = viewModel)
     }
     state.confirmDelete?.let { item ->
         AlertDialog(
@@ -235,6 +242,8 @@ private fun InboundCard(
     onEdit: () -> Unit,
     onAdvanced: () -> Unit,
     onDelete: () -> Unit,
+    /** Self-steal inbounds: change the decoy site's page. */
+    onSitePage: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     Card(Modifier.fillMaxWidth()) {
@@ -282,6 +291,9 @@ private fun InboundCard(
                 if (item.quickEditable && !item.selfSteal) {
                     TextButton(onClick = onEdit, enabled = !busy) { Text(stringResource(R.string.inbound_edit_reality)) }
                 }
+                if (onSitePage != null) {
+                    TextButton(onClick = onSitePage, enabled = !busy) { Text(stringResource(R.string.inbound_edit_site_page)) }
+                }
                 TextButton(onClick = onAdvanced, enabled = !busy) { Text(stringResource(R.string.inbound_edit_full)) }
                 TextButton(onClick = onDelete, enabled = !busy) {
                     Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
@@ -307,7 +319,6 @@ private fun Badge(text: String) {
 private fun AddInboundDialog(
     hasDomain: Boolean,
     selfStealRunning: Boolean,
-    onReality: () -> Unit,
     onSelfSteal: () -> Unit,
     onAdvanced: () -> Unit,
     onDismiss: () -> Unit,
@@ -317,16 +328,19 @@ private fun AddInboundDialog(
         title = { Text(stringResource(R.string.inbound_add)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                AddOption(stringResource(R.string.inbound_option_reality), stringResource(R.string.inbound_option_reality_text), true, onReality)
+                AddOption(
+                    stringResource(R.string.inbound_option_selfsteal),
+                    stringResource(
+                        when {
+                            !hasDomain -> R.string.error_selfsteal_no_domain
+                            selfStealRunning -> R.string.selfsteal_running
+                            else -> R.string.inbound_option_selfsteal_text
+                        },
+                    ),
+                    hasDomain && !selfStealRunning,
+                    onSelfSteal,
+                )
                 AddOption(stringResource(R.string.inbound_option_advanced), stringResource(R.string.inbound_option_advanced_text), true, onAdvanced)
-                if (hasDomain) {
-                    AddOption(
-                        stringResource(R.string.inbound_option_selfsteal),
-                        stringResource(if (selfStealRunning) R.string.selfsteal_running else R.string.inbound_option_selfsteal_text),
-                        !selfStealRunning,
-                        onSelfSteal,
-                    )
-                }
             }
         },
         confirmButton = {},
@@ -350,52 +364,13 @@ private fun AddOption(title: String, text: String, enabled: Boolean, onClick: ()
 }
 
 @Composable
-private fun RealityFormDialog(form: RealityForm, canCheck: Boolean, nodes: List<NodeChoice>, viewModel: InboundsViewModel) {
-    val editing = form.editingId != null
+private fun RealityFormDialog(form: RealityForm, canCheck: Boolean, viewModel: InboundsViewModel) {
     AlertDialog(
         onDismissRequest = { if (!form.saving) viewModel.closeRealityForm() },
-        title = { Text(stringResource(if (editing) R.string.inbound_edit_reality_title else R.string.inbound_new_reality_title)) },
+        title = { Text(stringResource(R.string.inbound_edit_reality_title)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!editing && nodes.isNotEmpty()) {
-                    // Like the panel's "Deploy to": only nodes that answer can take a new inbound.
-                    val placements = listOf<NodeChoice?>(null) + nodes.filter { it.online || it.id == form.nodeId }
-                    SelectField(
-                        label = stringResource(R.string.inbound_field_node),
-                        selected = nodes.firstOrNull { it.id == form.nodeId },
-                        options = placements,
-                        text = { it?.name ?: stringResource(R.string.inbound_node_local) },
-                        onSelect = { viewModel.onNode(it?.id) },
-                    )
-                    if (form.nodeId != null && nodes.firstOrNull { it.id == form.nodeId }?.serverId == null && canCheck) {
-                        Text(stringResource(R.string.inbound_node_scan_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                if (!editing) {
-                    OutlinedTextField(
-                        value = form.remark,
-                        onValueChange = viewModel::onRemark,
-                        label = { Text(stringResource(R.string.field_remark)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = form.port,
-                        onValueChange = viewModel::onPort,
-                        label = { Text(stringResource(R.string.field_inbound_port)) },
-                        isError = form.fieldError == ValidationField.INBOUND_PORT,
-                        supportingText = if (form.fieldError == ValidationField.INBOUND_PORT) {
-                            { Text(stringResource(ValidationField.INBOUND_PORT.messageRes())) }
-                        } else {
-                            null
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    Text(stringResource(R.string.inbound_edit_reality_text), style = MaterialTheme.typography.bodySmall)
-                }
+                Text(stringResource(R.string.inbound_edit_reality_text), style = MaterialTheme.typography.bodySmall)
                 SniField(
                     value = form.sni,
                     onChange = viewModel::onSni,
@@ -425,7 +400,7 @@ private fun RealityFormDialog(form: RealityForm, canCheck: Boolean, nodes: List<
         confirmButton = {
             Button(onClick = viewModel::saveReality, enabled = !form.saving) {
                 if (form.saving) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Text(stringResource(if (editing) R.string.save else R.string.create))
+                else Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
@@ -458,11 +433,48 @@ private fun SelfStealDialog(form: SelfStealForm, domain: String, viewModel: Inbo
                     )
                 }
                 FingerprintField(form.fingerprint, viewModel::onSelfStealFingerprint)
+                SitePageField(form.sitePage, onPick = viewModel::onSelfStealPage, onReset = viewModel::resetSelfStealPage)
             }
         },
         confirmButton = { Button(onClick = viewModel::startSelfSteal) { Text(stringResource(R.string.selfsteal_start)) } },
         dismissButton = { TextButton(onClick = viewModel::closeSelfSteal) { Text(stringResource(R.string.cancel)) } },
     )
+}
+
+@Composable
+private fun SitePageDialog(page: SitePageChoice, domain: String, viewModel: InboundsViewModel) {
+    AlertDialog(
+        onDismissRequest = viewModel::closeSitePage,
+        title = { Text(stringResource(R.string.site_page_change_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.site_page_change_text, domain), style = MaterialTheme.typography.bodyMedium)
+                SitePageField(page, onPick = viewModel::onSitePage, onReset = viewModel::resetSitePage)
+            }
+        },
+        confirmButton = {
+            Button(onClick = viewModel::applySitePage, enabled = !page.invalid) { Text(stringResource(R.string.site_page_apply)) }
+        },
+        dismissButton = { TextButton(onClick = viewModel::closeSitePage) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+@Composable
+private fun DecoySiteCard(domain: String, enabled: Boolean, onChangePage: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.site_page_card_title), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    domain,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = onChangePage, enabled = enabled) { Text(stringResource(R.string.site_page_change)) }
+        }
+    }
 }
 
 @Composable
@@ -488,12 +500,21 @@ private fun SelfStealProgressCard(progress: SelfStealProgress, onDismiss: () -> 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(
-                        when {
-                            running && progress.action == SelfStealAction.INSTALL -> R.string.selfsteal_progress_install
-                            running -> R.string.selfsteal_progress_remove
-                            progress.state == DeployState.SUCCEEDED && progress.action == SelfStealAction.INSTALL -> R.string.selfsteal_done_install
-                            progress.state == DeployState.SUCCEEDED -> R.string.selfsteal_done_remove
-                            else -> R.string.selfsteal_failed
+                        when (progress.state) {
+                            DeployState.RUNNING -> when (progress.action) {
+                                SelfStealAction.INSTALL -> R.string.selfsteal_progress_install
+                                SelfStealAction.PAGE -> R.string.selfsteal_progress_page
+                                SelfStealAction.REMOVE -> R.string.selfsteal_progress_remove
+                            }
+                            DeployState.SUCCEEDED -> when (progress.action) {
+                                SelfStealAction.INSTALL -> R.string.selfsteal_done_install
+                                SelfStealAction.PAGE -> R.string.selfsteal_done_page
+                                SelfStealAction.REMOVE -> R.string.selfsteal_done_remove
+                            }
+                            DeployState.FAILED -> when (progress.action) {
+                                SelfStealAction.PAGE -> R.string.selfsteal_failed_page
+                                else -> R.string.selfsteal_failed
+                            }
                         },
                     ),
                     style = MaterialTheme.typography.titleMedium,

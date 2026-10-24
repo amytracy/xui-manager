@@ -46,6 +46,7 @@ class DeployOrchestrator @Inject constructor(
     private val runner: RemoteScriptRunner,
     private val registry: DeployProgressRegistry,
     private val nodes: NodeRepository,
+    private val sitePages: SitePageStore,
     private val json: Json,
 ) {
     suspend fun run(jobId: Long) {
@@ -95,6 +96,7 @@ class DeployOrchestrator @Inject constructor(
                     }
                 }
                 jobDao.markLaunched(jobId, jobDir, System.currentTimeMillis())
+                sitePages.remove(jobId)
             } else {
                 log(jobId, "Re-attached to the running deployment")
             }
@@ -178,6 +180,7 @@ class DeployOrchestrator @Inject constructor(
     /** A failed run may leave the Reality private key or the API token on the server; remove them and the job secrets. */
     private suspend fun cleanupAfterFailure(jobId: Long, target: SshTarget?, jobDir: String?) {
         secrets.removeByPrefix(SecretKeys.jobPrefix(jobId))
+        sitePages.remove(jobId)
         if (target == null || jobDir == null || jobDao.get(jobId)?.launchedAt == null) return
         try {
             ssh.withSession(target) { it.execSh(RemoteJob.cleanupCommand(jobDir)) }
@@ -194,7 +197,8 @@ class DeployOrchestrator @Inject constructor(
             mapOf(
                 "params.env" to RemoteJob.paramsEnv(params, host).toByteArray(),
                 "secrets.env" to RemoteJob.secretsEnv(params.panelUsername, password, basePath).toByteArray(),
-            )
+            ) +
+            sitePages.get(jobId)?.takeIf { params.selfSteal }?.let { mapOf(DeployConfig.SITE_PAGE_FILE to it) }.orEmpty()
         runner.launch(session, jobDir, files, "run.sh", params.sudo)
         log(jobId, "Deployment started on the server")
     }

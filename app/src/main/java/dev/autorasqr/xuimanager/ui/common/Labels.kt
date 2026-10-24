@@ -122,6 +122,14 @@ fun AppError.message(context: Context): String = when (this) {
         },
     )
     AppError.GeodataFailed -> context.getString(R.string.error_geodata)
+    is AppError.SystemUpdateFailed -> context.getString(
+        when (detail) {
+            "lock" -> R.string.error_sysupdate_lock
+            "reboot" -> R.string.error_sysupdate_reboot
+            else -> R.string.error_sysupdate
+        },
+    )
+    is AppError.PanelUpdateFailed -> context.getString(R.string.error_panel_update, detail ?: "—")
     AppError.PanelUnauthorized -> context.getString(R.string.error_panel_unauthorized)
     AppError.PanelNotFound -> context.getString(R.string.error_panel_not_found)
     AppError.PanelNotDeployed -> context.getString(R.string.error_panel_not_deployed)

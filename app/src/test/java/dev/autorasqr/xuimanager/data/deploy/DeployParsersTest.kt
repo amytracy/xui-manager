@@ -195,5 +195,7 @@ class DeployParsersTest {
         assertEquals(AppError.CertificateIssueFailed(CertificateIssue.PORT_80_BUSY), DeployExitCodes.toAppError("E_TLS_PORT80"))
         assertEquals(AppError.CertificateIssueFailed(CertificateIssue.VALIDATION_FAILED), DeployExitCodes.toAppError("E_TLS"))
         assertEquals(AppError.Unexpected("E_UNEXPECTED:1"), DeployExitCodes.toAppError("E_UNEXPECTED:1"))
+        assertEquals(AppError.SystemUpdateFailed(null), DeployExitCodes.toAppError("E_SYSUPDATE"))
+        assertEquals(AppError.SystemUpdateFailed("lock"), DeployExitCodes.toAppError("E_SYSUPDATE:lock"))
     }
 }
