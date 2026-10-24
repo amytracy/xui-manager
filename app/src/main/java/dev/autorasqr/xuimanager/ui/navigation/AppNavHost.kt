@@ -1,6 +1,7 @@
 package dev.autorasqr.xuimanager.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -16,6 +17,7 @@ import dev.autorasqr.xuimanager.ui.panel.PanelScreen
 import dev.autorasqr.xuimanager.ui.routing.RoutingScreen
 import dev.autorasqr.xuimanager.ui.servers.ServerDetailScreen
 import dev.autorasqr.xuimanager.ui.servers.ServerEditScreen
+import dev.autorasqr.xuimanager.ui.servers.UninstallScreen
 import kotlinx.serialization.Serializable
 
 /** Start destination; forwards to the server screen or to onboarding. */
@@ -51,6 +53,10 @@ data class NodesRoute(val serverId: Long)
 @Serializable
 data class NodeEditRoute(val serverId: Long, val nodeId: Int = 0)
 
+/** Removes everything the app installed from the server (and its node servers), then the servers from the app. */
+@Serializable
+data class UninstallRoute(val serverId: Long)
+
 /** inboundId = 0 creates a new inbound. */
 @Serializable
 data class InboundEditorRoute(val serverId: Long, val inboundId: Int = 0)
@@ -80,14 +86,14 @@ fun AppNavHost() {
                     }
                 },
                 onUpdated = { nav.popBackStack() },
-                onDeleted = { wasNode ->
-                    if (wasNode) {
-                        // Back to the master's node list, past the deleted node's own screens.
-                        if (!nav.popBackStack<NodesRoute>(inclusive = false)) nav.popBackStack()
-                    } else {
-                        nav.navigate(HomeRoute) { popUpTo(nav.graph.id) { inclusive = true } }
-                    }
-                },
+                onDeleted = { wasNode -> nav.afterServerDeleted(wasNode) },
+                onUninstall = { id -> nav.navigate(UninstallRoute(id)) },
+            )
+        }
+        composable<UninstallRoute> {
+            UninstallScreen(
+                onBack = { nav.popBackStack() },
+                onDone = { wasNode -> nav.afterServerDeleted(wasNode) },
             )
         }
         composable<ServerDetailRoute> {
@@ -148,5 +154,15 @@ fun AppNavHost() {
         composable<ClientsRoute> {
             ClientsScreen(onBack = { nav.popBackStack() })
         }
+    }
+}
+
+/** Leaves the screens of a server that is gone from the app. */
+private fun NavHostController.afterServerDeleted(wasNode: Boolean) {
+    if (wasNode) {
+        // Back to the master's node list, past the deleted node's own screens.
+        if (!popBackStack<NodesRoute>(inclusive = false)) popBackStack()
+    } else {
+        navigate(HomeRoute) { popUpTo(graph.id) { inclusive = true } }
     }
 }

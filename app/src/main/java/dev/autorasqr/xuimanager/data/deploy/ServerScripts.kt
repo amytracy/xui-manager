@@ -12,7 +12,7 @@ import dev.autorasqr.xuimanager.domain.repository.DeployRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** One-off maintenance scripts from assets/deploy (selfsteal.sh, geodata.sh), run as root and followed like a deploy. */
+/** One-off maintenance scripts from assets/deploy (selfsteal.sh, geodata.sh, uninstall.sh…), run as root and followed like a deploy. */
 @Singleton
 class ServerScripts @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -24,7 +24,9 @@ class ServerScripts @Inject constructor(
     /**
      * Uploads lib.sh and [script] with the params.env [params] builds from the precheck, runs it and returns the
      * values of its result.env (empty if it writes none). A non-zero exit becomes the matching AppException.
-     * [extraFiles] are uploaded into the job directory next to the script.
+     * [extraFiles] are uploaded into the job directory next to the script, and so are the [libs] from assets/deploy
+     * it sources. With [removeJobsAfter] a successful run takes the app's whole job directory away instead of only
+     * the secrets in its own one.
      */
     suspend fun run(
         server: Server,
@@ -34,12 +36,14 @@ class ServerScripts @Inject constructor(
         params: (PrecheckResult) -> String,
         log: (String) -> Unit,
         extraFiles: Map<String, ByteArray> = emptyMap(),
+        libs: List<String> = emptyList(),
+        removeJobsAfter: Boolean = false,
     ): Map<String, String> {
         log("Checking the server" + if (checkDomain && server.domain != null) " and that ${server.domain} points at it" else "")
         val precheck = deployRepository.precheck(server.id, checkDomain)
         val target = targets.forServer(server)
         val jobDir = RemoteJob.jobDir(precheck.home, System.currentTimeMillis())
-        val files = listOf("lib.sh", script).associateWith { name -> context.assets.open("deploy/$name").use { it.readBytes() } } +
+        val files = (listOf("lib.sh", script) + libs).associateWith { name -> context.assets.open("deploy/$name").use { it.readBytes() } } +
             extraFiles + ("params.env" to params(precheck).toByteArray())
         val launchedAt = System.currentTimeMillis()
         ssh.withSession(target) { session -> runner.launch(session, jobDir, files, script, precheck.sudo) }
@@ -58,7 +62,8 @@ class ServerScripts @Inject constructor(
             val result = ssh.withSession(target) { it.execSh("cd ${shQuote(jobDir)} && cat result.env 2>/dev/null || true") }
             return parseKeyValues(result.stdoutText)
         } finally {
-            runCatching { ssh.withSession(target) { it.execSh(RemoteJob.cleanupCommand(jobDir)) } }
+            val cleanup = if (removeJobsAfter && exit == "0") RemoteJob.removeJobsCommand(precheck.home) else RemoteJob.cleanupCommand(jobDir)
+            runCatching { ssh.withSession(target) { it.execSh(cleanup) } }
         }
     }
 }

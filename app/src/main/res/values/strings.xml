@@ -437,6 +437,22 @@
     <string name="node_server_managed">This server is a node: its inbounds, clients and subscriptions are managed from the main panel.</string>
     <string name="node_server_unregistered">This server is meant to be a node but is not registered on the main panel yet. Register it from the main panel\'s node list.</string>
     <string name="delete_node_server_text">%1$s is removed from the app and, if the main panel can be reached, from its nodes. 3x-ui keeps running on the server.</string>
+    <string name="delete_from_server_text">“Delete from the server” also removes 3x-ui and everything else the app installed there (and on this panel’s node servers).</string>
+    <string name="delete_from_app">Delete from the app only</string>
+    <string name="delete_from_server">Delete from the server</string>
+    <string name="uninstall_title">Delete from the server</string>
+    <string name="uninstall_warning">Everything the app installed on %1$s (%2$s) is deleted for good: the panel, all inbounds, clients and subscriptions. VPN connections through this server stop. Afterwards the server is removed from the app.</string>
+    <string name="uninstall_nodes">The same is done first on the node servers of this panel: %1$s.</string>
+    <string name="uninstall_what_title">What is deleted</string>
+    <string name="uninstall_what">• 3x-ui and Xray: service, files, database and logs\n• fail2ban IP Limit rules of the panel\n• the self-steal decoy site (Caddy)\n• RoscomVPN geo files and their update timer\n• acme.sh, its cron job and all Let’s Encrypt certificates\n• database backups in /root/xui-backup\n• firewall rules for the panel, subscription and inbound ports and port 80 (the SSH port always stays open)\n• the app’s job directories</string>
+    <string name="uninstall_kept">System packages (curl, socat, cron, fail2ban and others) stay installed. A port that another service still listens on keeps its firewall rule.</string>
+    <string name="uninstall_deploy_running">A deployment is running on this server. Wait until it finishes.</string>
+    <string name="uninstall_confirm_label">Type %1$s to confirm</string>
+    <string name="uninstall_confirm">Delete everything</string>
+    <string name="uninstall_running">Deleting from the server…</string>
+    <string name="uninstall_done">Everything is deleted from the server, and the server is removed from the app</string>
+    <string name="uninstall_failed">Could not delete everything from the server</string>
+    <string name="uninstall_finish">Done</string>
     <string name="deploy_node_title">Node installation</string>
     <string name="deploy_go_nodes">Go to nodes</string>
     <string name="warning_node_not_registered">3x-ui is installed, but the main panel did not accept the node. Open the node list and tap Register once the server is reachable from the main panel.</string>
@@ -485,6 +501,7 @@
     <string name="sysupdate_rebooting">The system is updated. The server reboots in a minute and is back 1–2 minutes later.</string>
     <string name="sysupdate_failed">The system update failed</string>
     <string name="error_sysupdate">The package manager reported an error. See the log for details.</string>
+    <string name="error_uninstall">3x-ui could not be stopped or its files could not be deleted. See the log for details.</string>
     <string name="error_sysupdate_lock">Another package manager (often automatic security updates) is busy on the server. Try again in a few minutes.</string>
     <string name="error_sysupdate_reboot">Packages are updated, but the restart could not be scheduled. Restart the server manually.</string>
 </resources>

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -70,6 +71,8 @@ fun ServerEditScreen(
     onCreated: (Long) -> Unit,
     onUpdated: () -> Unit,
     onDeleted: (wasNode: Boolean) -> Unit,
+    /** Opens the screen that removes everything the app installed from the server, and then the server. */
+    onUninstall: (Long) -> Unit,
     viewModel: ServerEditViewModel = hiltViewModel(),
 ) {
     SecureScreen()
@@ -280,15 +283,30 @@ fun ServerEditScreen(
             onDismissRequest = { confirmDelete = false },
             title = { Text(stringResource(R.string.delete_server_title)) },
             text = {
-                Text(stringResource(if (state.masterServerId != null) R.string.delete_node_server_text else R.string.delete_server_text, state.name))
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(if (state.masterServerId != null) R.string.delete_node_server_text else R.string.delete_server_text, state.name))
+                    Text(stringResource(R.string.delete_from_server_text))
+                    OutlinedButton(
+                        onClick = {
+                            confirmDelete = false
+                            viewModel.delete()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.delete_from_app)) }
+                    Button(
+                        onClick = {
+                            confirmDelete = false
+                            state.serverId?.let(onUninstall)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.delete_from_server)) }
+                }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = false
-                    viewModel.delete()
-                }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.cancel)) } },
+            confirmButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }

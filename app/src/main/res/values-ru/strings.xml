@@ -435,6 +435,22 @@
     <string name="node_server_managed">Этот сервер — нода: его инбаунды, клиенты и подписки управляются с главной панели.</string>
     <string name="node_server_unregistered">Этот сервер должен стать нодой, но ещё не подключён к главной панели. Зарегистрируйте его из списка нод главной панели.</string>
     <string name="delete_node_server_text">%1$s будет удалён из приложения и, если главная панель доступна, из её нод. 3x-ui на сервере продолжит работать.</string>
+    <string name="delete_from_server_text">«Удалить с сервера» дополнительно удалит 3x-ui и всё остальное, что приложение установило на сервер (и на серверы-ноды этой панели).</string>
+    <string name="delete_from_app">Удалить только из приложения</string>
+    <string name="delete_from_server">Удалить с сервера</string>
+    <string name="uninstall_title">Удаление с сервера</string>
+    <string name="uninstall_warning">Всё, что приложение установило на %1$s (%2$s), будет удалено безвозвратно: панель, все inbound\'ы, клиенты и подписки. VPN-подключения через этот сервер перестанут работать. После этого сервер будет удалён из приложения.</string>
+    <string name="uninstall_nodes">Сначала то же самое будет сделано на серверах-нодах этой панели: %1$s.</string>
+    <string name="uninstall_what_title">Что будет удалено</string>
+    <string name="uninstall_what">• 3x-ui и Xray: сервис, файлы, база данных и журналы\n• правила fail2ban для IP Limit панели\n• сайт-заглушка self-steal (Caddy)\n• геофайлы RoscomVPN и таймер их обновления\n• acme.sh, его задача cron и все сертификаты Let’s Encrypt\n• резервные копии базы в /root/xui-backup\n• правила файрвола для портов панели, подписки, inbound\'ов и порта 80 (порт SSH всегда остаётся открытым)\n• рабочие каталоги приложения</string>
+    <string name="uninstall_kept">Системные пакеты (curl, socat, cron, fail2ban и другие) остаются. Если порт всё ещё слушает другой сервис, его правило в файрволе сохраняется.</string>
+    <string name="uninstall_deploy_running">На сервере идёт развёртывание. Дождитесь его окончания.</string>
+    <string name="uninstall_confirm_label">Введите %1$s для подтверждения</string>
+    <string name="uninstall_confirm">Удалить всё</string>
+    <string name="uninstall_running">Удаление с сервера…</string>
+    <string name="uninstall_done">С сервера всё удалено, сервер убран из приложения</string>
+    <string name="uninstall_failed">Не удалось удалить всё с сервера</string>
+    <string name="uninstall_finish">Готово</string>
     <string name="deploy_node_title">Установка ноды</string>
     <string name="deploy_go_nodes">К нодам</string>
     <string name="warning_node_not_registered">3x-ui установлена, но главная панель не приняла ноду. Откройте список нод и нажмите «Зарегистрировать», когда сервер станет доступен с главной панели.</string>
@@ -483,6 +499,7 @@
     <string name="sysupdate_rebooting">Система обновлена. Сервер перезагрузится через минуту и снова будет доступен через 1–2 минуты.</string>
     <string name="sysupdate_failed">Не удалось обновить систему</string>
     <string name="error_sysupdate">Менеджер пакетов сообщил об ошибке. Подробности в журнале.</string>
+    <string name="error_uninstall">Не удалось остановить 3x-ui или удалить его файлы. Подробности в журнале.</string>
     <string name="error_sysupdate_lock">На сервере уже работает другой менеджер пакетов (часто — автоматические обновления безопасности). Повторите через несколько минут.</string>
     <string name="error_sysupdate_reboot">Пакеты обновлены, но перезагрузку запланировать не удалось. Перезагрузите сервер вручную.</string>
 </resources>

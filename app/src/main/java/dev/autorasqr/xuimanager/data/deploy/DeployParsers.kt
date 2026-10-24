@@ -181,6 +181,7 @@ object DeployExitCodes {
             "E_SELFSTEAL" -> AppError.SelfStealFailed(SelfStealIssue.SETUP)
             "E_GEODATA" -> AppError.GeodataFailed
             "E_SYSUPDATE" -> AppError.SystemUpdateFailed(detail)
+            "E_UNINSTALL" -> AppError.UninstallFailed
             else -> AppError.Unexpected(code)
         }
     }

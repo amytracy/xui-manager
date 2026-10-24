@@ -49,6 +49,15 @@ object RemoteJob {
         "OWNER_GID" to gid.toString(),
     )
 
+    /** params.env for uninstall.sh: [ports] are closed in the firewall, [sshPort] never is. */
+    fun uninstallEnv(uid: Int, gid: Int, sshPort: Int, ports: Collection<Int>): String = env(
+        "OWNER_UID" to uid.toString(),
+        "OWNER_GID" to gid.toString(),
+        "SSH_PORT" to sshPort.toString(),
+        "PORTS" to ports.filter { it in 1..65535 }.distinct().sorted().joinToString(":"),
+        *caddyEnv(),
+    )
+
     private fun caddyEnv() = arrayOf(
         "CADDY_VERSION" to DeployConfig.CADDY_VERSION,
         "CADDY_SHA256_AMD64" to DeployConfig.CADDY_SHA256_AMD64,
@@ -92,6 +101,10 @@ object RemoteJob {
     /** Removes everything secret; the masked log is kept for troubleshooting. */
     fun cleanupCommand(jobDir: String): String =
         "cd ${shQuote(jobDir)} && rm -rf result.env result.env.tmp x25519.out secrets.env site.html install.sh caddy.tar.gz caddy"
+
+    /** After uninstall.sh: the app's whole directory in the login user's home, logs included. */
+    fun removeJobsCommand(home: String): String =
+        "rm -rf ${shQuote(home.trimEnd('/') + "/" + DeployConfig.JOBS_DIR.substringBefore('/'))}"
 
     private fun env(vararg pairs: Pair<String, String>): String = buildString {
         pairs.forEach { (key, value) ->

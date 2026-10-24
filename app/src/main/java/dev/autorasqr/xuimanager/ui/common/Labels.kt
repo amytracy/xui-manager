@@ -122,6 +122,7 @@ fun AppError.message(context: Context): String = when (this) {
         },
     )
     AppError.GeodataFailed -> context.getString(R.string.error_geodata)
+    AppError.UninstallFailed -> context.getString(R.string.error_uninstall)
     is AppError.SystemUpdateFailed -> context.getString(
         when (detail) {
             "lock" -> R.string.error_sysupdate_lock

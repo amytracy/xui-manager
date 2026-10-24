@@ -25,6 +25,7 @@ object DeployConfig {
     const val GEODATA_TIMEOUT_MS = 10 * 60_000L
     /** apt may first wait up to 10 min for unattended-upgrades to release its lock. */
     const val SYSUPDATE_TIMEOUT_MS = 40 * 60_000L
+    const val UNINSTALL_TIMEOUT_MS = 15 * 60_000L
 
     const val POLL_INTERVAL_MS = 1_500L
     const val MAX_LOG_LINES = 3_000

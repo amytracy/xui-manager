@@ -46,3 +46,12 @@ data class XrayUpdateProgress(
 
 /** A newer app release on GitHub; installed by hand from [releaseUrl]. */
 data class AppUpdateOffer(val currentVersion: String, val latestVersion: String, val releaseUrl: String, val notes: String)
+
+/** Removing everything the app put on a server (and its node servers), then the servers from the app. */
+data class UninstallProgress(
+    val state: DeployState,
+    val log: List<String>,
+    val error: AppError?,
+    /** Servers already cleaned and deleted from the app; the rest stay for another try after a failure. */
+    val removedServerIds: Set<Long> = emptySet(),
+)

@@ -1,4 +1,4 @@
-# XUI Manager shared shell functions, sourced by run.sh and selfsteal.sh.
+# XUI Manager shared shell functions, sourced by run.sh, selfsteal.sh and the maintenance scripts.
 #
 # Expects from the caller: JOB_DIR, LOG, OWNER_UID, OWNER_GID, FINISHED=0, IPTABLES_CHANGED=0, ESC, and for
 # certificates SSL_MODE, SERVER_HOST, CERT_ROOT and ACME. CERT_RELOAD_CMD overrides what acme.sh runs after a renewal.
@@ -145,6 +145,40 @@ open_port() {
         return 0
     fi
     log "No active firewall found, $port/tcp needs no rule"
+}
+
+# close_port PORT: takes back the rule open_port added for PORT/tcp, in the same firewall open_port would pick.
+close_port() {
+    local port="$1"
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -i '^Status: active' >/dev/null; then
+        ufw --force delete allow "$port/tcp" >>"$LOG" 2>&1 && log "ufw: removed the rule for $port/tcp"
+        return 0
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+        if firewall-cmd --permanent --query-port="$port/tcp" >/dev/null 2>&1; then
+            firewall-cmd --permanent --remove-port="$port/tcp" >>"$LOG" 2>&1
+            firewall-cmd --reload >>"$LOG" 2>&1
+            log "firewalld: removed $port/tcp"
+        fi
+        return 0
+    fi
+    if command -v iptables >/dev/null 2>&1; then
+        local removed=0
+        while iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null; do
+            iptables -D INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null || break
+            removed=1
+        done
+        if command -v ip6tables >/dev/null 2>&1; then
+            while ip6tables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null; do
+                ip6tables -D INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null || break
+                removed=1
+            done
+        fi
+        if [ "$removed" = 1 ]; then
+            IPTABLES_CHANGED=1
+            log "iptables: removed the rule for $port/tcp"
+        fi
+    fi
 }
 
 persist_iptables() {
