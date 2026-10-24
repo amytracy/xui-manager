@@ -60,7 +60,7 @@ internal class V2PanelApi(
     private val panelVersion: String,
 ) : PanelApi {
 
-    override val capabilities = PanelCapabilities(multiInboundClients = false, realityScan = false)
+    override val capabilities = PanelCapabilities(multiInboundClients = false, realityScan = false, xrayInstall = true)
 
     private val sessionLock = Mutex()
     @Volatile private var loggedIn = false
@@ -225,6 +225,15 @@ internal class V2PanelApi(
 
     override suspend fun restartXray() {
         request { if (modernServerRoutes) service.restartXray() else service.restartXrayLegacy() }
+    }
+
+    override suspend fun xrayVersions(): List<String> = PanelJson.decode<List<String>?>(
+        json,
+        request { if (modernServerRoutes) service.xrayVersions() else service.xrayVersionsLegacy() },
+    ).orEmpty()
+
+    override suspend fun installXray(version: String) {
+        request { if (modernServerRoutes) service.installXray(version) else service.installXrayLegacy(version) }
     }
 
     override suspend fun newX25519(): X25519Keys {

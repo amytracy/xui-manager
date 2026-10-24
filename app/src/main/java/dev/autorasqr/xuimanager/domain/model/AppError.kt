@@ -35,6 +35,10 @@ sealed interface AppError {
     data class SystemUpdateFailed(val detail: String?) : AppError
     /** The panel's own updater failed or did not report back; [detail] is the panel's message or the exit code. */
     data class PanelUpdateFailed(val detail: String?) : AppError
+    /** Installing a new Xray-core failed or Xray did not come back on the new version; [detail] is the panel's message. */
+    data class XrayUpdateFailed(val detail: String?) : AppError
+    /** GitHub did not answer the app's release check as expected; [detail] is the HTTP status or GitHub's message. */
+    data class ReleaseCheckFailed(val detail: String?) : AppError
     data object PanelUnauthorized : AppError
     data object PanelNotFound : AppError
     data object PanelNotDeployed : AppError

@@ -230,6 +230,31 @@ class V2PanelApiTest {
     }
 
     @Test
+    fun `xray install routes follow the panel version`() = runBlocking {
+        val versions = """{"success":true,"obj":["v25.10.31","v25.9.15"]}"""
+        loginOk()
+        respond(versions)
+        respond("""{"success":true}""")
+        val legacy = api("2.6.7")
+        assertTrue(legacy.capabilities.xrayInstall)
+        assertEquals(listOf("v25.10.31", "v25.9.15"), legacy.xrayVersions())
+        legacy.installXray("v25.10.31")
+        server.takeRequest()
+        server.takeRequest().let { assertEquals("POST" to "/v2path/server/getXrayVersion", it.method to it.url.encodedPath) }
+        server.takeRequest().let { assertEquals("POST" to "/v2path/server/installXray/v25.10.31", it.method to it.url.encodedPath) }
+
+        loginOk()
+        respond(versions)
+        respond("""{"success":true}""")
+        val modern = api("2.9.4")
+        modern.xrayVersions()
+        modern.installXray("v25.10.31")
+        server.takeRequest()
+        server.takeRequest().let { assertEquals("GET" to "/v2path/panel/api/server/getXrayVersion", it.method to it.url.encodedPath) }
+        server.takeRequest().let { assertEquals("POST" to "/v2path/panel/api/server/installXray/v25.10.31", it.method to it.url.encodedPath) }
+    }
+
+    @Test
     fun `inbound summary carries enable flag, traffic, clients and reality details`() = runBlocking {
         loginOk()
         respond(

@@ -15,6 +15,7 @@ import dev.autorasqr.xuimanager.domain.model.DeployState
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateOffer
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateProgress
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateTarget
+import dev.autorasqr.xuimanager.domain.model.UpdateCheck
 import dev.autorasqr.xuimanager.domain.repository.PanelUpdateRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -42,31 +43,29 @@ class PanelUpdateRepositoryImpl @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val progress = ConcurrentHashMap<Long, MutableStateFlow<PanelUpdateProgress?>>()
-    private val offers = ConcurrentHashMap<Long, Offer>()
+    private val checks = ConcurrentHashMap<Long, UpdateCheck<PanelUpdateOffer>>()
     private val prompted = ConcurrentHashMap.newKeySet<Long>()
 
-    /** A finished check; [offer] null means "nothing to update". */
-    private class Offer(val offer: PanelUpdateOffer?)
-
-    override suspend fun check(serverId: Long, refresh: Boolean): PanelUpdateOffer? = withContext(Dispatchers.IO) {
-        if (!refresh) offers[serverId]?.let { return@withContext it.offer }
-        val offer = try {
+    override suspend fun check(serverId: Long, refresh: Boolean): UpdateCheck<PanelUpdateOffer> = withContext(Dispatchers.IO) {
+        if (!refresh) checks[serverId]?.let { return@withContext it }
+        val result = try {
             val (server, api) = panels.forServer(serverId)
             if (server.isNode || !api.capabilities.selfUpdate) {
-                null
+                UpdateCheck.Unavailable()
             } else {
                 val info = api.panelUpdateInfo()
                 val nodes = if (api.capabilities.nodes) api.listNodes() else emptyList()
-                offerFrom(server.name, info, nodes)
+                offerFrom(server.name, info, nodes)?.let { UpdateCheck.Available(it) } ?: UpdateCheck.UpToDate
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // No GitHub access from the server, panel down, older v3 without the endpoint: just offer nothing.
-            return@withContext null
+            // No GitHub access from the server, panel down, older v3 without the endpoint. Not remembered, so the
+            // next screen visit tries again.
+            return@withContext UpdateCheck.Unavailable(e.toAppError())
         }
-        offers[serverId] = Offer(offer)
-        offer
+        checks[serverId] = result
+        result
     }
 
     override fun shouldPrompt(serverId: Long): Boolean = serverId !in prompted
@@ -101,7 +100,7 @@ class PanelUpdateRepositoryImpl @Inject constructor(
                 log("ERROR: $error")
                 flow.update { it?.copy(state = DeployState.FAILED, error = error) }
             } finally {
-                offers.remove(serverId)
+                checks.remove(serverId)
             }
         }
     }

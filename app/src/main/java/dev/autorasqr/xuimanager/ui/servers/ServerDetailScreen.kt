@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -44,6 +45,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.autorasqr.xuimanager.BuildConfig
 import dev.autorasqr.xuimanager.R
 import dev.autorasqr.xuimanager.data.deploy.DeployConfig
 import dev.autorasqr.xuimanager.data.panel.PanelVersion
@@ -51,6 +53,7 @@ import dev.autorasqr.xuimanager.domain.model.DeployState
 import dev.autorasqr.xuimanager.domain.model.PanelLogin
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateOffer
 import dev.autorasqr.xuimanager.domain.model.Server
+import dev.autorasqr.xuimanager.domain.model.UpdateCheck
 import dev.autorasqr.xuimanager.ui.common.Clipboard
 import dev.autorasqr.xuimanager.ui.common.JobLog
 import dev.autorasqr.xuimanager.ui.common.SecureScreen
@@ -75,9 +78,11 @@ fun ServerDetailScreen(
     val deployRunning by viewModel.deployRunning.collectAsStateWithLifecycle()
     val status by viewModel.status.collectAsStateWithLifecycle()
     val panelLogin by viewModel.panelLogin.collectAsStateWithLifecycle()
-    val updateOffer by viewModel.updateOffer.collectAsStateWithLifecycle()
-    val showUpdateDialog by viewModel.showUpdateDialog.collectAsStateWithLifecycle()
+    val updates by viewModel.updates.collectAsStateWithLifecycle()
+    val updateDialog by viewModel.updateDialog.collectAsStateWithLifecycle()
     val panelUpdate by viewModel.panelUpdate.collectAsStateWithLifecycle()
+    val xrayUpdate by viewModel.xrayUpdate.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
     val systemUpdate by viewModel.systemUpdate.collectAsStateWithLifecycle()
     val confirmSystemUpdate by viewModel.confirmSystemUpdate.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -139,6 +144,19 @@ fun ServerDetailScreen(
                     onDismiss = viewModel::dismissPanelUpdate,
                 )
             }
+            xrayUpdate?.let { job ->
+                JobLog(
+                    title = when (job.state) {
+                        DeployState.RUNNING -> stringResource(R.string.xray_update_running, job.targetVersion)
+                        DeployState.SUCCEEDED -> stringResource(R.string.xray_update_done, job.targetVersion)
+                        DeployState.FAILED -> stringResource(R.string.xray_update_failed)
+                    },
+                    state = job.state,
+                    log = job.log,
+                    error = job.error,
+                    onDismiss = viewModel::dismissXrayUpdate,
+                )
+            }
             systemUpdate?.let { job ->
                 JobLog(
                     title = stringResource(
@@ -157,9 +175,6 @@ fun ServerDetailScreen(
             PanelCard(
                 server = current,
                 deployRunning = deployRunning,
-                updateOffer = updateOffer,
-                updating = panelUpdate?.state == DeployState.RUNNING,
-                onUpdatePanel = viewModel::startPanelUpdate,
                 onDeploy = { onDeploy(current.id) },
                 onClients = { onClients(current.id) },
                 onInbounds = { onInbounds(current.id) },
@@ -171,6 +186,18 @@ fun ServerDetailScreen(
             if (current.panel != null) {
                 StatusCard(status, onRestart = viewModel::requestRestart)
             }
+            val busy = deployRunning || panelUpdate?.state == DeployState.RUNNING ||
+                xrayUpdate?.state == DeployState.RUNNING || systemUpdate?.state == DeployState.RUNNING
+            UpdatesCard(
+                server = current,
+                xrayVersion = status.status?.xrayVersion,
+                updates = updates,
+                busy = busy,
+                onCheck = viewModel::checkUpdates,
+                onOpenRelease = { url -> uriHandler.openUri(url) },
+                onUpdatePanel = viewModel::startPanelUpdate,
+                onUpdateXray = viewModel::startXrayUpdate,
+            )
             SshCard(
                 server = current,
                 updateEnabled = !deployRunning && systemUpdate?.state != DeployState.RUNNING,
@@ -179,15 +206,49 @@ fun ServerDetailScreen(
         }
     }
 
-    val offer = updateOffer
-    if (showUpdateDialog && offer != null) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissUpdateDialog,
-            title = { Text(stringResource(R.string.panel_update_title)) },
-            text = { Text(updateOfferText(offer)) },
-            confirmButton = { TextButton(onClick = viewModel::startPanelUpdate) { Text(stringResource(R.string.panel_update_confirm)) } },
-            dismissButton = { TextButton(onClick = viewModel::dismissUpdateDialog) { Text(stringResource(R.string.panel_update_later)) } },
-        )
+    val appOffer = updates.appOffer
+    val panelOffer = updates.panelOffer
+    val xrayOffer = updates.xrayOffer
+    when (updateDialog) {
+        UpdateDialog.APP -> if (appOffer != null) {
+            AlertDialog(
+                onDismissRequest = viewModel::dismissUpdateDialog,
+                title = { Text(stringResource(R.string.app_update_title)) },
+                text = {
+                    val notes = appOffer.notes.lines().take(APP_NOTES_LINES).joinToString("\n").trim()
+                    Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.app_update_text, appOffer.latestVersion, appOffer.currentVersion))
+                        if (notes.isNotEmpty()) Text(notes, style = MaterialTheme.typography.bodySmall)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        uriHandler.openUri(appOffer.releaseUrl)
+                        viewModel.dismissUpdateDialog()
+                    }) { Text(stringResource(R.string.app_update_open)) }
+                },
+                dismissButton = { TextButton(onClick = viewModel::dismissUpdateDialog) { Text(stringResource(R.string.panel_update_later)) } },
+            )
+        }
+        UpdateDialog.PANEL -> if (panelOffer != null) {
+            AlertDialog(
+                onDismissRequest = viewModel::dismissUpdateDialog,
+                title = { Text(stringResource(R.string.panel_update_title)) },
+                text = { Text(updateOfferText(panelOffer)) },
+                confirmButton = { TextButton(onClick = viewModel::startPanelUpdate) { Text(stringResource(R.string.panel_update_confirm)) } },
+                dismissButton = { TextButton(onClick = viewModel::dismissUpdateDialog) { Text(stringResource(R.string.panel_update_later)) } },
+            )
+        }
+        UpdateDialog.XRAY -> if (xrayOffer != null) {
+            AlertDialog(
+                onDismissRequest = viewModel::dismissUpdateDialog,
+                title = { Text(stringResource(R.string.xray_update_title)) },
+                text = { Text(stringResource(R.string.xray_update_text, xrayOffer.latestVersion, xrayOffer.currentVersion.ifBlank { "?" })) },
+                confirmButton = { TextButton(onClick = viewModel::startXrayUpdate) { Text(stringResource(R.string.panel_update_confirm)) } },
+                dismissButton = { TextButton(onClick = viewModel::dismissUpdateDialog) { Text(stringResource(R.string.panel_update_later)) } },
+            )
+        }
+        null -> Unit
     }
 
     if (confirmSystemUpdate) {
@@ -272,6 +333,97 @@ private fun updateOfferText(offer: PanelUpdateOffer): String {
     return lines.joinToString("\n") + "\n\n" + stringResource(R.string.panel_update_note)
 }
 
+private const val APP_NOTES_LINES = 12
+
+/** The app, 3x-ui and Xray: what runs now, what is newer, and the buttons to get it. */
+@Composable
+private fun UpdatesCard(
+    server: Server,
+    xrayVersion: String?,
+    updates: UpdatesUiState,
+    busy: Boolean,
+    onCheck: () -> Unit,
+    onOpenRelease: (String) -> Unit,
+    onUpdatePanel: () -> Unit,
+    onUpdateXray: () -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.updates_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                if (updates.checking) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+            }
+
+            UpdateRow(stringResource(R.string.updates_app), BuildConfig.VERSION_NAME, updates.app) { offer ->
+                stringResource(R.string.updates_available, offer.latestVersion)
+            }
+            updates.appOffer?.let { offer ->
+                OutlinedButton(onClick = { onOpenRelease(offer.releaseUrl) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.app_update_open))
+                }
+            }
+
+            val panel = server.panel
+            if (panel != null) {
+                if (!server.isNode) {
+                    UpdateRow(stringResource(R.string.updates_panel), panel.version, updates.panel) { offer ->
+                        if (offer.master != null) {
+                            stringResource(R.string.updates_available, offer.latestVersion)
+                        } else {
+                            stringResource(R.string.panel_update_available_nodes, offer.nodes.joinToString { it.name })
+                        }
+                    }
+                    updates.panelOffer?.let { offer ->
+                        if (offer.master != null && offer.nodes.isNotEmpty()) {
+                            Text(
+                                stringResource(R.string.panel_update_available_nodes, offer.nodes.joinToString { it.name }),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        Button(onClick = onUpdatePanel, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.action_update_panel, offer.latestVersion))
+                        }
+                    }
+                }
+                UpdateRow(stringResource(R.string.updates_xray), xrayVersion?.ifBlank { null } ?: "?", updates.xray) { offer ->
+                    stringResource(R.string.updates_available, offer.latestVersion)
+                }
+                updates.xrayOffer?.let { offer ->
+                    Button(onClick = onUpdateXray, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.action_update_xray, offer.latestVersion))
+                    }
+                }
+            }
+
+            OutlinedButton(onClick = onCheck, enabled = !updates.checking, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.updates_check))
+            }
+        }
+    }
+}
+
+@Composable
+private fun <T> UpdateRow(label: String, current: String, check: UpdateCheck<T>?, available: @Composable (T) -> String) {
+    Column(Modifier.fillMaxWidth()) {
+        InfoRow(label, current)
+        val (text, color) = when (check) {
+            null -> stringResource(R.string.updates_checking) to MaterialTheme.colorScheme.onSurfaceVariant
+            UpdateCheck.UpToDate -> stringResource(R.string.updates_up_to_date) to LocalStatusColors.current.success
+            is UpdateCheck.Available -> available(check.offer) to MaterialTheme.colorScheme.primary
+            is UpdateCheck.Unavailable -> {
+                val error = check.error
+                if (error == null) {
+                    stringResource(R.string.updates_not_supported) to MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    stringResource(R.string.updates_failed, error.message()) to MaterialTheme.colorScheme.error
+                }
+            }
+        }
+        Text(text, style = MaterialTheme.typography.bodySmall, color = color)
+    }
+}
+
 @Composable
 private fun SshCard(server: Server, updateEnabled: Boolean, onSystemUpdate: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
@@ -303,9 +455,6 @@ private fun SshCard(server: Server, updateEnabled: Boolean, onSystemUpdate: () -
 private fun PanelCard(
     server: Server,
     deployRunning: Boolean,
-    updateOffer: PanelUpdateOffer?,
-    updating: Boolean,
-    onUpdatePanel: () -> Unit,
     onDeploy: () -> Unit,
     onClients: () -> Unit,
     onInbounds: () -> Unit,
@@ -327,20 +476,6 @@ private fun PanelCard(
                 InfoRow(stringResource(R.string.panel_port), panel.port.toString())
                 InfoRow(stringResource(R.string.panel_subscription), "${panel.subScheme.uppercase()} :${panel.subPort}")
                 InfoRow(stringResource(R.string.panel_deployed_at), Formatters.dateTime(panel.deployedAt))
-                if (updateOffer != null && !server.isNode) {
-                    if (updateOffer.master != null) {
-                        Text(stringResource(R.string.panel_update_available, updateOffer.latestVersion), color = MaterialTheme.colorScheme.primary)
-                    }
-                    if (updateOffer.nodes.isNotEmpty()) {
-                        Text(
-                            stringResource(R.string.panel_update_available_nodes, updateOffer.nodes.joinToString { it.name }),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    Button(onClick = onUpdatePanel, enabled = !updating && !deployRunning, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.action_update_panel, updateOffer.latestVersion))
-                    }
-                }
                 if (server.isNode) {
                     // Clients, inbounds and subscriptions of a node live on the main panel.
                     Text(

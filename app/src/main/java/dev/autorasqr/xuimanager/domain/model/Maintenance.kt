@@ -25,3 +25,24 @@ data class SystemUpdateProgress(
     /** The upgrade asked for a restart and the server reboots in about a minute. */
     val rebooting: Boolean = false,
 )
+
+/** Result of an update check for the app, the panel or Xray. */
+sealed interface UpdateCheck<out T> {
+    data object UpToDate : UpdateCheck<Nothing>
+    data class Available<T>(val offer: T) : UpdateCheck<T>
+    /** Not applicable here (v2 panel, node, no panel yet) when [error] is null, otherwise the check failed. */
+    data class Unavailable(val error: AppError? = null) : UpdateCheck<Nothing>
+}
+
+/** A newer Xray-core release than the one running on the server. */
+data class XrayUpdateOffer(val currentVersion: String, val latestVersion: String)
+
+data class XrayUpdateProgress(
+    val targetVersion: String,
+    val state: DeployState,
+    val log: List<String>,
+    val error: AppError?,
+)
+
+/** A newer app release on GitHub; installed by hand from [releaseUrl]. */
+data class AppUpdateOffer(val currentVersion: String, val latestVersion: String, val releaseUrl: String, val notes: String)

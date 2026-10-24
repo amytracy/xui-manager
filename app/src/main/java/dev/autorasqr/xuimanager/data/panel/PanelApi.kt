@@ -123,6 +123,17 @@ interface PanelApi {
 
     /** Outcome of the latest run; compare its runId with the one [startPanelUpdate] returned. */
     suspend fun panelUpdateStatus(): PanelUpdateRun = unsupported()
+
+    // --- Xray core (see [PanelCapabilities.xrayInstall]) ---
+
+    /** Xray-core release tags ("v26.7.1") the panel offers to install; fails when the server can't reach GitHub. */
+    suspend fun xrayVersions(): List<String> = unsupported()
+
+    /**
+     * Stops Xray, installs the release [version] (a tag from [xrayVersions]; "latest" is refused) and starts it again.
+     * The panel answers only when it is done.
+     */
+    suspend fun installXray(version: String): Unit = unsupported()
 }
 
 data class VlessEncAuth(val id: String, val label: String, val decryption: String, val encryption: String)

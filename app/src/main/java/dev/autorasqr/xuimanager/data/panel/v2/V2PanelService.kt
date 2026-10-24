@@ -86,4 +86,16 @@ interface V2PanelService {
 
     @POST("server/getNewX25519Cert")
     suspend fun newX25519Legacy(): Response<ResponseBody>
+
+    @GET("panel/api/server/getXrayVersion")
+    suspend fun xrayVersions(): Response<ResponseBody>
+
+    @POST("server/getXrayVersion")
+    suspend fun xrayVersionsLegacy(): Response<ResponseBody>
+
+    @POST("panel/api/server/installXray/{version}")
+    suspend fun installXray(@Path("version") version: String): Response<ResponseBody>
+
+    @POST("server/installXray/{version}")
+    suspend fun installXrayLegacy(@Path("version") version: String): Response<ResponseBody>
 }

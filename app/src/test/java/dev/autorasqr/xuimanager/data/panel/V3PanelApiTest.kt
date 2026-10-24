@@ -502,6 +502,27 @@ class V3PanelApiTest {
     }
 
     @Test
+    fun `xray versions are listed and installed by tag`() = runBlocking {
+        respond("""{"success":true,"obj":["v26.8.2","v26.7.1"]}""")
+        respond("""{"success":true,"msg":"Switch Xray version"}""")
+        respond("""{"success":false,"msg":"xray version \"latest\" is not in the fetched release list"}""")
+
+        val api = api()
+        assertTrue(api.capabilities.xrayInstall)
+        assertEquals(listOf("v26.8.2", "v26.7.1"), api.xrayVersions())
+        api.installXray("v26.8.2")
+        try {
+            api.installXray("latest")
+            fail("expected a panel error")
+        } catch (e: AppException) {
+            assertEquals(AppError.PanelError("xray version \"latest\" is not in the fetched release list"), e.error)
+        }
+
+        server.takeRequest().let { assertEquals("GET" to "/s3cretPath/panel/api/server/getXrayVersion", it.method to it.url.encodedPath) }
+        server.takeRequest().let { assertEquals("POST" to "/s3cretPath/panel/api/server/installXray/v26.8.2", it.method to it.url.encodedPath) }
+    }
+
+    @Test
     fun `a status file the panel has not written yet reads as pending`() = runBlocking {
         respond("""{"success":true,"obj":{"runId":"","state":"","exitCode":0,"finishedAt":0}}""")
         assertEquals(PanelUpdateRun("", "pending", 0), api().panelUpdateStatus())

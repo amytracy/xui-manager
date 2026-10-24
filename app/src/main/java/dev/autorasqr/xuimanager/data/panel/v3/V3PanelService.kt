@@ -177,4 +177,11 @@ interface V3PanelService {
 
     @GET("panel/api/server/getUpdateStatus")
     suspend fun updateStatus(): ResponseBody
+
+    /** obj is a list of Xray-core tags, newest first. */
+    @GET("panel/api/server/getXrayVersion")
+    suspend fun xrayVersions(): ResponseBody
+
+    @POST("panel/api/server/installXray/{version}")
+    suspend fun installXray(@Path("version") version: String): ResponseBody
 }

@@ -46,7 +46,7 @@ internal class V3PanelApi(
     private val json: Json,
 ) : PanelApi {
 
-    override val capabilities = PanelCapabilities(multiInboundClients = true, realityScan = true, routing = true, nodes = true, selfUpdate = true)
+    override val capabilities = PanelCapabilities(multiInboundClients = true, realityScan = true, routing = true, nodes = true, selfUpdate = true, xrayInstall = true)
 
     override suspend fun status(): PanelStatus {
         val dto = PanelJson.decode<V3Status>(json, call { service.status() })
@@ -327,6 +327,13 @@ internal class V3PanelApi(
     override suspend fun panelUpdateStatus(): PanelUpdateRun {
         val dto = PanelJson.decode<V3PanelUpdateStatus?>(json, call { service.updateStatus() }) ?: V3PanelUpdateStatus()
         return PanelUpdateRun(dto.runId, dto.state.ifBlank { "pending" }, dto.exitCode)
+    }
+
+    override suspend fun xrayVersions(): List<String> =
+        PanelJson.decode<List<String>?>(json, call { service.xrayVersions() }).orEmpty()
+
+    override suspend fun installXray(version: String) {
+        call { service.installXray(version) }
     }
 
     private suspend fun allSettings(): JsonObject =

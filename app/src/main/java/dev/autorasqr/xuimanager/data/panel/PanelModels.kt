@@ -39,6 +39,8 @@ data class PanelCapabilities(
     val nodes: Boolean = false,
     /** v3 checks GitHub for a newer release and runs the official updater on itself and on its nodes. */
     val selfUpdate: Boolean = false,
+    /** The panel lists Xray-core releases from GitHub and installs one in place of the running binary. */
+    val xrayInstall: Boolean = false,
 )
 
 /** The panel's Xray config template and the outbound test URL saved alongside it. */

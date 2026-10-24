@@ -12,6 +12,7 @@ import dev.autorasqr.xuimanager.data.db.AppDatabase
 import dev.autorasqr.xuimanager.data.db.DeployJobDao
 import dev.autorasqr.xuimanager.data.db.ServerDao
 import dev.autorasqr.xuimanager.data.deploy.DeployLauncher
+import dev.autorasqr.xuimanager.data.repository.AppUpdateRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.ClientRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.DeployRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.InboundEditorRepositoryImpl
@@ -20,11 +21,13 @@ import dev.autorasqr.xuimanager.data.repository.NodeRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.PanelUpdateRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.RoutingRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.SystemUpdateRepositoryImpl
+import dev.autorasqr.xuimanager.data.repository.XrayUpdateRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.PanelStatusRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.PanelWebRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.ServerRepositoryImpl
 import dev.autorasqr.xuimanager.data.secure.KeystoreSecretStore
 import dev.autorasqr.xuimanager.data.secure.SecretStore
+import dev.autorasqr.xuimanager.domain.repository.AppUpdateRepository
 import dev.autorasqr.xuimanager.domain.repository.ClientRepository
 import dev.autorasqr.xuimanager.domain.repository.DeployRepository
 import dev.autorasqr.xuimanager.domain.repository.InboundEditorRepository
@@ -33,6 +36,7 @@ import dev.autorasqr.xuimanager.domain.repository.NodeRepository
 import dev.autorasqr.xuimanager.domain.repository.PanelUpdateRepository
 import dev.autorasqr.xuimanager.domain.repository.RoutingRepository
 import dev.autorasqr.xuimanager.domain.repository.SystemUpdateRepository
+import dev.autorasqr.xuimanager.domain.repository.XrayUpdateRepository
 import dev.autorasqr.xuimanager.domain.repository.PanelStatusRepository
 import dev.autorasqr.xuimanager.domain.repository.PanelWebRepository
 import dev.autorasqr.xuimanager.domain.repository.ServerRepository
@@ -79,5 +83,7 @@ abstract class BindingsModule {
     @Binds abstract fun panelWebRepository(impl: PanelWebRepositoryImpl): PanelWebRepository
     @Binds abstract fun panelUpdateRepository(impl: PanelUpdateRepositoryImpl): PanelUpdateRepository
     @Binds abstract fun systemUpdateRepository(impl: SystemUpdateRepositoryImpl): SystemUpdateRepository
+    @Binds abstract fun xrayUpdateRepository(impl: XrayUpdateRepositoryImpl): XrayUpdateRepository
+    @Binds abstract fun appUpdateRepository(impl: AppUpdateRepositoryImpl): AppUpdateRepository
     @Binds abstract fun deployLauncher(impl: ServiceDeployLauncher): DeployLauncher
 }

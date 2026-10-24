@@ -130,6 +130,8 @@ fun AppError.message(context: Context): String = when (this) {
         },
     )
     is AppError.PanelUpdateFailed -> context.getString(R.string.error_panel_update, detail ?: "—")
+    is AppError.XrayUpdateFailed -> context.getString(R.string.error_xray_update, detail ?: "—")
+    is AppError.ReleaseCheckFailed -> context.getString(R.string.error_release_check, detail ?: "—")
     AppError.PanelUnauthorized -> context.getString(R.string.error_panel_unauthorized)
     AppError.PanelNotFound -> context.getString(R.string.error_panel_not_found)
     AppError.PanelNotDeployed -> context.getString(R.string.error_panel_not_deployed)
