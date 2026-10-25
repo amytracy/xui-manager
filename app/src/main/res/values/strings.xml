@@ -504,4 +504,24 @@
     <string name="error_uninstall">3x-ui could not be stopped or its files could not be deleted. See the log for details.</string>
     <string name="error_sysupdate_lock">Another package manager (often automatic security updates) is busy on the server. Try again in a few minutes.</string>
     <string name="error_sysupdate_reboot">Packages are updated, but the restart could not be scheduled. Restart the server manually.</string>
+    <!-- Restore an existing server (phone change) -->
+    <string name="panel_found_text">3x-ui %1$s is already installed on this server. Restore it to manage it from this phone: nothing is reinstalled, clients, inbounds and subscriptions stay as they are.</string>
+    <string name="action_restore">Restore</string>
+    <string name="onboarding_restore_hint">Already set up a server with this app (on another phone, before reinstalling)? Enter its SSH login: the app finds the panel and connects to it without reinstalling anything.</string>
+    <string name="node_restore_intro">SSH access to this node\'s server. The app connects to the panel already installed there without reinstalling it, then registers it on the main panel again.</string>
+    <string name="node_connect_ssh">Connect over SSH</string>
+    <string name="restore_title">Restore server</string>
+    <string name="restore_running">Restoring…</string>
+    <string name="restore_done">Server restored</string>
+    <string name="restore_failed">Restore failed</string>
+    <string name="restore_finish">Done</string>
+    <string name="restore_intro">The app connects to the 3x-ui already running on %1$s (%2$s) and finds its port, path, domain and decoy site by itself.</string>
+    <string name="restore_kept_title">Stays as it is</string>
+    <string name="restore_kept">3x-ui and Xray versions, ports, inbounds, clients and their traffic, subscription links, certificates, the firewall, self-steal and routing. Nothing is installed and x-ui is not restarted, so connected clients keep working.</string>
+    <string name="restore_changed_title">What changes</string>
+    <string name="restore_changed">The panel gets a new login and password, and the app gets a new API token. The old phone (or anyone using the old password) loses access to the panel.</string>
+    <string name="restore_changed_node">The panel gets a new login and password and a new API token, and the main panel is updated with the new token. The old phone loses access.</string>
+    <string name="restore_deploy_running">A deployment is running on this server. Wait for it to finish.</string>
+    <string name="error_restore_no_panel">3x-ui is not installed on this server. Deploy it instead.</string>
+    <string name="error_restore_cert">The panel has no valid Let\'s Encrypt certificate, so the app can\'t connect to it safely. Use Deploy → \"Take over as is\", which issues one.</string>
 </resources>

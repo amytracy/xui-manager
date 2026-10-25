@@ -58,6 +58,19 @@ object RemoteJob {
         *caddyEnv(),
     )
 
+    /** params.env for restore.sh: [preferredHost] is tried first when the panel certificate covers several names. */
+    fun restoreEnv(uid: Int, gid: Int, preferredHost: String): String = env(
+        "OWNER_UID" to uid.toString(),
+        "OWNER_GID" to gid.toString(),
+        "PREFERRED_HOST" to preferredHost,
+    )
+
+    /** secrets.env for restore.sh: the panel keeps its path, only the login and password change. */
+    fun restoreSecretsEnv(username: String, password: String): String = env(
+        "PANEL_USERNAME" to username,
+        "PANEL_PASSWORD" to password,
+    )
+
     private fun caddyEnv() = arrayOf(
         "CADDY_VERSION" to DeployConfig.CADDY_VERSION,
         "CADDY_SHA256_AMD64" to DeployConfig.CADDY_SHA256_AMD64,

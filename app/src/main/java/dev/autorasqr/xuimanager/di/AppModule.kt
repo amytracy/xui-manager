@@ -21,6 +21,7 @@ import dev.autorasqr.xuimanager.data.repository.NodeRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.PanelUpdateRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.RoutingRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.SystemUpdateRepositoryImpl
+import dev.autorasqr.xuimanager.data.repository.RestoreRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.UninstallRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.XrayUpdateRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.PanelStatusRepositoryImpl
@@ -37,6 +38,7 @@ import dev.autorasqr.xuimanager.domain.repository.NodeRepository
 import dev.autorasqr.xuimanager.domain.repository.PanelUpdateRepository
 import dev.autorasqr.xuimanager.domain.repository.RoutingRepository
 import dev.autorasqr.xuimanager.domain.repository.SystemUpdateRepository
+import dev.autorasqr.xuimanager.domain.repository.RestoreRepository
 import dev.autorasqr.xuimanager.domain.repository.UninstallRepository
 import dev.autorasqr.xuimanager.domain.repository.XrayUpdateRepository
 import dev.autorasqr.xuimanager.domain.repository.PanelStatusRepository
@@ -86,6 +88,7 @@ abstract class BindingsModule {
     @Binds abstract fun panelUpdateRepository(impl: PanelUpdateRepositoryImpl): PanelUpdateRepository
     @Binds abstract fun systemUpdateRepository(impl: SystemUpdateRepositoryImpl): SystemUpdateRepository
     @Binds abstract fun uninstallRepository(impl: UninstallRepositoryImpl): UninstallRepository
+    @Binds abstract fun restoreRepository(impl: RestoreRepositoryImpl): RestoreRepository
     @Binds abstract fun xrayUpdateRepository(impl: XrayUpdateRepositoryImpl): XrayUpdateRepository
     @Binds abstract fun appUpdateRepository(impl: AppUpdateRepositoryImpl): AppUpdateRepository
     @Binds abstract fun deployLauncher(impl: ServiceDeployLauncher): DeployLauncher

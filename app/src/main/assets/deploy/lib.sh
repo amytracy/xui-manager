@@ -248,3 +248,43 @@ issue_cert() {
     CERT_FILE="$dir/fullchain.pem"
     KEY_FILE="$dir/privkey.pem"
 }
+
+# --- The installed panel (XUI_BIN) ---
+
+# read_panel_settings: sets PANEL_PORT and WEB_BASE_PATH from the running panel's own settings.
+read_panel_settings() {
+    local current
+    # Some 2.x releases print the current password here too: the output is parsed in memory and never logged.
+    current=$("$XUI_BIN" setting -show true 2>/dev/null)
+    PANEL_PORT=$(printf '%s\n' "$current" | sed -n 's/^port:[[:space:]]*//p' | head -n 1 | tr -d '[:space:]')
+    WEB_BASE_PATH=$(printf '%s\n' "$current" | sed -n 's/^webBasePath:[[:space:]]*//p' | head -n 1 | tr -d '[:space:]')
+    [[ "$PANEL_PORT" =~ ^[0-9]+$ ]] || fail "E_INSTALL:settings" "could not read the current panel port"
+}
+
+# read_panel_cert: sets CERT_FILE and KEY_FILE to the certificate the panel serves (empty when it has none).
+read_panel_cert() {
+    local current
+    current=$("$XUI_BIN" setting -getCert true 2>/dev/null)
+    CERT_FILE=$(printf '%s\n' "$current" | sed -n 's/^cert:[[:space:]]*//p' | head -n 1 | tr -d '[:space:]')
+    KEY_FILE=$(printf '%s\n' "$current" | sed -n 's/^key:[[:space:]]*//p' | head -n 1 | tr -d '[:space:]')
+}
+
+# issue_api_token: sets API_TOKEN to a new token named "xui-manager" (3x-ui recreates it, so an older one stops
+# working), or leaves it empty on 2.x panels, which have no tokens and are reached with the login and password.
+issue_api_token() {
+    local setting_help
+    API_TOKEN=""
+    # Captured first: grepping the live output with -q under pipefail can SIGPIPE x-ui and read as "no tokens".
+    setting_help=$("$XUI_BIN" setting -h 2>&1)
+    if printf '%s\n' "$setting_help" | grep getApiToken >/dev/null; then
+        API_TOKEN=$("$XUI_BIN" setting -getApiToken -tokenName xui-manager 2>/dev/null | sed -n 's/^apiToken:[[:space:]]*//p' | tail -n 1)
+        [ -n "$API_TOKEN" ] || fail E_TOKEN "could not issue an API token"
+        log "API token \"xui-manager\" issued"
+    else
+        # 3.x always has tokens; without one the app could not reach the panel at all.
+        case "$("$XUI_BIN" -v 2>/dev/null | head -n 1)" in
+            v[3-9]* | [3-9]*) fail E_TOKEN "this 3.x panel does not offer API tokens" ;;
+        esac
+        log "This panel version has no API tokens; the app will sign in with the new login and password"
+    fi
+}

@@ -138,9 +138,22 @@ fun ServerEditScreen(
         ) {
             if (state.serverId == null) {
                 Text(
-                    stringResource(if (state.masterServerId != null) R.string.node_server_intro else R.string.onboarding_text),
+                    stringResource(
+                        when {
+                            state.restoreNodeId != null -> R.string.node_restore_intro
+                            state.masterServerId != null -> R.string.node_server_intro
+                            else -> R.string.onboarding_text
+                        },
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                if (state.masterServerId == null) {
+                    Text(
+                        stringResource(R.string.onboarding_restore_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             Field(
                 value = state.name,

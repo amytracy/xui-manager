@@ -34,6 +34,8 @@ data class ServerEditState(
     val serverId: Long?,
     /** Set when the server is (or is being added as) a node of that server's panel. */
     val masterServerId: Long? = null,
+    /** A node already on the master panel that this new server restores rather than deploys. */
+    val restoreNodeId: Int? = null,
     val loaded: Boolean = false,
     val name: String = "",
     val host: String = "",
@@ -70,7 +72,15 @@ class ServerEditViewModel @Inject constructor(
     private val route = savedStateHandle.toRoute<ServerEditRoute>()
     private val routeId = route.serverId.takeIf { it > 0 }
     private val _state = MutableStateFlow(
-        ServerEditState(serverId = routeId, masterServerId = route.masterServerId.takeIf { it > 0 }, loaded = routeId == null),
+        ServerEditState(
+            serverId = routeId,
+            masterServerId = route.masterServerId.takeIf { it > 0 },
+            restoreNodeId = route.restoreNodeId.takeIf { it > 0 && routeId == null },
+            loaded = routeId == null,
+            // The node's panel address is usually the SSH host too (an IP or the server's domain).
+            name = route.name,
+            host = route.host,
+        ),
     )
     val state: StateFlow<ServerEditState> = _state.asStateFlow()
 
@@ -244,6 +254,7 @@ class ServerEditViewModel @Inject constructor(
             passphrase = passphrase,
             domain = normalizeDomain(domain),
             masterServerId = masterServerId,
+            nodeId = restoreNodeId,
         )
     }
 

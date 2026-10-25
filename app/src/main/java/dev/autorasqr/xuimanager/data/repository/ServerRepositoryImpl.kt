@@ -77,6 +77,7 @@ class ServerRepositoryImpl @Inject constructor(
                     panel = null,
                     domain = domain,
                     masterServerId = draft.masterServerId,
+                    nodeId = draft.nodeId.takeIf { draft.masterServerId != null },
                 ),
             )
         } else {

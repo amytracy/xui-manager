@@ -182,6 +182,8 @@ object DeployExitCodes {
             "E_GEODATA" -> AppError.GeodataFailed
             "E_SYSUPDATE" -> AppError.SystemUpdateFailed(detail)
             "E_UNINSTALL" -> AppError.UninstallFailed
+            "E_RESTORE_MISSING" -> AppError.RestoreNoPanel
+            "E_RESTORE_CERT" -> AppError.RestoreNoTrustedCert
             else -> AppError.Unexpected(code)
         }
     }

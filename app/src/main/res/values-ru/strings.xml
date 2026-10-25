@@ -502,4 +502,24 @@
     <string name="error_uninstall">Не удалось остановить 3x-ui или удалить его файлы. Подробности в журнале.</string>
     <string name="error_sysupdate_lock">На сервере уже работает другой менеджер пакетов (часто — автоматические обновления безопасности). Повторите через несколько минут.</string>
     <string name="error_sysupdate_reboot">Пакеты обновлены, но перезагрузку запланировать не удалось. Перезагрузите сервер вручную.</string>
+    <!-- Восстановление сервера (смена телефона) -->
+    <string name="panel_found_text">На этом сервере уже установлен 3x-ui %1$s. Восстановите его, чтобы управлять с этого телефона: ничего не переустанавливается, клиенты, inbound-ы и подписки остаются как есть.</string>
+    <string name="action_restore">Восстановить</string>
+    <string name="onboarding_restore_hint">Сервер уже настраивался этим приложением (на другом телефоне или до переустановки)? Введите его SSH-данные — приложение найдёт панель и подключится к ней без переустановки.</string>
+    <string name="node_restore_intro">SSH-доступ к серверу этой ноды. Приложение подключится к уже установленной там панели без переустановки и заново зарегистрирует её на главной панели.</string>
+    <string name="node_connect_ssh">Подключить по SSH</string>
+    <string name="restore_title">Восстановление сервера</string>
+    <string name="restore_running">Восстановление…</string>
+    <string name="restore_done">Сервер восстановлен</string>
+    <string name="restore_failed">Не удалось восстановить</string>
+    <string name="restore_finish">Готово</string>
+    <string name="restore_intro">Приложение подключится к уже работающему 3x-ui на %1$s (%2$s) и само найдёт его порт, путь, домен и сайт-заглушку.</string>
+    <string name="restore_kept_title">Остаётся как есть</string>
+    <string name="restore_kept">Версии 3x-ui и Xray, порты, inbound-ы, клиенты и их трафик, ссылки подписок, сертификаты, firewall, self-steal и маршрутизация. Ничего не устанавливается и x-ui не перезапускается — подключённые клиенты продолжают работать.</string>
+    <string name="restore_changed_title">Что изменится</string>
+    <string name="restore_changed">У панели будут новые логин и пароль, у приложения — новый API-токен. Старый телефон (и все, кто знал старый пароль) потеряет доступ к панели.</string>
+    <string name="restore_changed_node">У панели будут новые логин, пароль и API-токен, главная панель получит новый токен. Старый телефон потеряет доступ.</string>
+    <string name="restore_deploy_running">На этом сервере идёт развёртывание. Дождитесь его окончания.</string>
+    <string name="error_restore_no_panel">На этом сервере не установлен 3x-ui. Разверните его.</string>
+    <string name="error_restore_cert">У панели нет действующего сертификата Let\'s Encrypt, поэтому приложение не может безопасно к ней подключиться. Используйте «Развернуть» → «Подключить как есть» — он выпустит сертификат.</string>
 </resources>

@@ -68,6 +68,8 @@ data class ServerDraft(
     val domain: String = "",
     /** For a new server: deploy it as a node of this server's panel. */
     val masterServerId: Long? = null,
+    /** For a new node server: the node it already is on the master panel (restored rather than deployed). */
+    val nodeId: Int? = null,
 )
 
 /** What the user needs to sign in to the panel in a browser. [password] is null if it was never stored. */

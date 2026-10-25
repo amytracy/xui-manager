@@ -66,6 +66,9 @@ data class UpdatesUiState(
     val xrayOffer get() = (xray as? UpdateCheck.Available)?.offer
 }
 
+/** A 3x-ui the server already runs although the app has no panel for it (a new phone): restore it instead of deploying. */
+data class InstalledPanel(val version: String)
+
 /** The offer dialogs shown once per app run, one after another. */
 enum class UpdateDialog { APP, PANEL, XRAY }
 
@@ -108,7 +111,23 @@ class ServerDetailViewModel @Inject constructor(
     private val _confirmSystemUpdate = MutableStateFlow(false)
     val confirmSystemUpdate: StateFlow<Boolean> = _confirmSystemUpdate.asStateFlow()
 
+    private val _installedPanel = MutableStateFlow<InstalledPanel?>(null)
+    val installedPanel: StateFlow<InstalledPanel?> = _installedPanel.asStateFlow()
+
     init {
+        viewModelScope.launch {
+            // Read-only look over SSH; when it fails (offline, host key not confirmed yet) the card offers a deploy as before.
+            val current = server.first { it != null } ?: return@launch
+            if (current.panel != null) return@launch
+            val precheck = try {
+                deployRepository.precheck(serverId, checkDomain = false)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                return@launch
+            }
+            if (precheck.existingInstalled) _installedPanel.value = InstalledPanel(precheck.existingVersion.orEmpty())
+        }
         viewModelScope.launch {
             server.first { it != null }
             val found = checkAll(refresh = false)

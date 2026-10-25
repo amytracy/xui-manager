@@ -35,6 +35,10 @@ sealed interface AppError {
     data class SystemUpdateFailed(val detail: String?) : AppError
     /** uninstall.sh could not stop or delete 3x-ui. */
     data object UninstallFailed : AppError
+    /** Restore found no 3x-ui on the server. */
+    data object RestoreNoPanel : AppError
+    /** Restore found a panel without a valid public certificate, which the app can't reach safely. */
+    data object RestoreNoTrustedCert : AppError
     /** The panel's own updater failed or did not report back; [detail] is the panel's message or the exit code. */
     data class PanelUpdateFailed(val detail: String?) : AppError
     /** Installing a new Xray-core failed or Xray did not come back on the new version; [detail] is the panel's message. */

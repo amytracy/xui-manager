@@ -16,6 +16,7 @@ import dev.autorasqr.xuimanager.ui.nodes.NodesScreen
 import dev.autorasqr.xuimanager.ui.panel.PanelScreen
 import dev.autorasqr.xuimanager.ui.routing.RoutingScreen
 import dev.autorasqr.xuimanager.ui.servers.ServerDetailScreen
+import dev.autorasqr.xuimanager.ui.servers.RestoreScreen
 import dev.autorasqr.xuimanager.ui.servers.ServerEditScreen
 import dev.autorasqr.xuimanager.ui.servers.UninstallScreen
 import kotlinx.serialization.Serializable
@@ -24,9 +25,19 @@ import kotlinx.serialization.Serializable
 @Serializable
 object HomeRoute
 
-/** serverId = 0 creates a new server; with masterServerId it is deployed as a node of that server's panel. */
+/**
+ * serverId = 0 creates a new server; with masterServerId it is deployed as a node of that server's panel. With
+ * restoreNodeId it is that node, already on the master panel, and is restored over SSH instead ([host] and [name]
+ * prefill the form).
+ */
 @Serializable
-data class ServerEditRoute(val serverId: Long = 0L, val masterServerId: Long = 0L)
+data class ServerEditRoute(
+    val serverId: Long = 0L,
+    val masterServerId: Long = 0L,
+    val restoreNodeId: Int = 0,
+    val host: String = "",
+    val name: String = "",
+)
 
 @Serializable
 data class ServerDetailRoute(val serverId: Long)
@@ -53,6 +64,10 @@ data class NodesRoute(val serverId: Long)
 @Serializable
 data class NodeEditRoute(val serverId: Long, val nodeId: Int = 0)
 
+/** Connects the app to the panel already set up on the server, without deploying it again. */
+@Serializable
+data class RestoreRoute(val serverId: Long)
+
 /** Removes everything the app installed from the server (and its node servers), then the servers from the app. */
 @Serializable
 data class UninstallRoute(val serverId: Long)
@@ -74,12 +89,16 @@ fun AppNavHost() {
         composable<ServerEditRoute> { entry ->
             // Onboarding is the root screen when there is no server yet; editing is opened from the server screen.
             val canGoBack = nav.previousBackStackEntry != null
-            val addingNode = entry.toRoute<ServerEditRoute>().masterServerId > 0
+            val route = entry.toRoute<ServerEditRoute>()
+            val addingNode = route.masterServerId > 0
             ServerEditScreen(
                 onBack = if (canGoBack) ({ nav.popBackStack() }) else null,
                 onCreated = { id ->
-                    // A new node server goes straight to its deployment, which registers it on the master afterwards.
-                    if (addingNode) {
+                    // A new node server goes straight to its deployment, which registers it on the master afterwards;
+                    // a node that is already on the master is restored instead.
+                    if (route.restoreNodeId > 0) {
+                        nav.navigate(RestoreRoute(id)) { popUpTo<ServerEditRoute> { inclusive = true } }
+                    } else if (addingNode) {
                         nav.navigate(DeployRoute(id)) { popUpTo<ServerEditRoute> { inclusive = true } }
                     } else {
                         nav.navigate(ServerDetailRoute(id)) { popUpTo<ServerEditRoute> { inclusive = true } }
@@ -89,6 +108,9 @@ fun AppNavHost() {
                 onDeleted = { wasNode -> nav.afterServerDeleted(wasNode) },
                 onUninstall = { id -> nav.navigate(UninstallRoute(id)) },
             )
+        }
+        composable<RestoreRoute> {
+            RestoreScreen(onBack = { nav.popBackStack() }, onDone = { nav.popBackStack() })
         }
         composable<UninstallRoute> {
             UninstallScreen(
@@ -105,6 +127,7 @@ fun AppNavHost() {
                 onRouting = { id -> nav.navigate(RoutingRoute(id)) },
                 onNodes = { id -> nav.navigate(NodesRoute(id)) },
                 onOpenPanel = { id -> nav.navigate(PanelRoute(id)) },
+                onRestore = { id -> nav.navigate(RestoreRoute(id)) },
                 // The home server is the root; a node's server screen is opened from the node list.
                 onBack = if (nav.previousBackStackEntry != null) ({ nav.popBackStack() }) else null,
             )
@@ -117,6 +140,9 @@ fun AppNavHost() {
                 onEdit = { masterId, nodeId -> nav.navigate(NodeEditRoute(masterId, nodeId)) },
                 onServer = { id -> nav.navigate(ServerDetailRoute(id)) },
                 onDeploy = { id -> nav.navigate(DeployRoute(id)) },
+                onConnectSsh = { masterId, node ->
+                    nav.navigate(ServerEditRoute(masterServerId = masterId, restoreNodeId = node.id, host = node.address, name = node.name))
+                },
             )
         }
         composable<NodeEditRoute> {

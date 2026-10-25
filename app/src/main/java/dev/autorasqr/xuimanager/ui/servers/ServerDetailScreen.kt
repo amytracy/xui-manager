@@ -71,6 +71,7 @@ fun ServerDetailScreen(
     onRouting: (Long) -> Unit,
     onNodes: (Long) -> Unit,
     onOpenPanel: (Long) -> Unit,
+    onRestore: (Long) -> Unit,
     onBack: (() -> Unit)? = null,
     viewModel: ServerDetailViewModel = hiltViewModel(),
 ) {
@@ -85,6 +86,7 @@ fun ServerDetailScreen(
     val uriHandler = LocalUriHandler.current
     val systemUpdate by viewModel.systemUpdate.collectAsStateWithLifecycle()
     val confirmSystemUpdate by viewModel.confirmSystemUpdate.collectAsStateWithLifecycle()
+    val installedPanel by viewModel.installedPanel.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         viewModel.refreshDeployState()
         viewModel.startStatusUpdates()
@@ -175,7 +177,9 @@ fun ServerDetailScreen(
             PanelCard(
                 server = current,
                 deployRunning = deployRunning,
+                installedPanel = installedPanel,
                 onDeploy = { onDeploy(current.id) },
+                onRestore = { onRestore(current.id) },
                 onClients = { onClients(current.id) },
                 onInbounds = { onInbounds(current.id) },
                 onRouting = { onRouting(current.id) },
@@ -455,7 +459,9 @@ private fun SshCard(server: Server, updateEnabled: Boolean, onSystemUpdate: () -
 private fun PanelCard(
     server: Server,
     deployRunning: Boolean,
+    installedPanel: InstalledPanel?,
     onDeploy: () -> Unit,
+    onRestore: () -> Unit,
     onClients: () -> Unit,
     onInbounds: () -> Unit,
     onRouting: () -> Unit,
@@ -466,7 +472,15 @@ private fun PanelCard(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.panel_section), style = MaterialTheme.typography.titleMedium)
             val panel = server.panel
-            if (panel == null) {
+            if (panel == null && installedPanel != null) {
+                Text(stringResource(R.string.panel_found_text, installedPanel.version.ifEmpty { "3x-ui" }))
+                Button(onClick = onRestore, enabled = !deployRunning, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.action_restore))
+                }
+                OutlinedButton(onClick = onDeploy, enabled = !deployRunning, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.action_redeploy))
+                }
+            } else if (panel == null) {
                 Text(stringResource(R.string.panel_not_deployed_text, DeployConfig.XUI_VERSION))
                 Button(onClick = onDeploy, enabled = !deployRunning, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.action_deploy))

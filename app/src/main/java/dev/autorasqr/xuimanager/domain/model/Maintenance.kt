@@ -55,3 +55,10 @@ data class UninstallProgress(
     /** Servers already cleaned and deleted from the app; the rest stay for another try after a failure. */
     val removedServerIds: Set<Long> = emptySet(),
 )
+
+/** Reconnecting the app to a panel that is already set up on the server, without deploying it again. */
+data class RestoreProgress(
+    val state: DeployState,
+    val log: List<String>,
+    val error: AppError?,
+)

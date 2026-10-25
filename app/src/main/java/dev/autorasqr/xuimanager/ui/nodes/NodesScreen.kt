@@ -71,6 +71,7 @@ fun NodesScreen(
     onEdit: (masterId: Long, nodeId: Int) -> Unit,
     onServer: (serverId: Long) -> Unit,
     onDeploy: (serverId: Long) -> Unit,
+    onConnectSsh: (masterId: Long, node: Node) -> Unit,
     viewModel: NodesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -175,6 +176,7 @@ fun NodesScreen(
                         onProbe = { viewModel.probe(node) },
                         onEdit = { onEdit(viewModel.serverId, node.id) },
                         onServer = node.serverId?.let { id -> { onServer(id) } },
+                        onConnectSsh = { onConnectSsh(viewModel.serverId, node) },
                         onDelete = { viewModel.requestDelete(node) },
                     )
                 }
@@ -242,6 +244,7 @@ private fun NodeCard(
     onProbe: () -> Unit,
     onEdit: () -> Unit,
     onServer: (() -> Unit)?,
+    onConnectSsh: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -295,6 +298,10 @@ private fun NodeCard(
                     IconButton(onClick = onDelete, enabled = !busy) {
                         Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
                     }
+                }
+                // A node the app has no SSH access to (added by hand, or deployed from another phone).
+                if (onServer == null) {
+                    TextButton(onClick = onConnectSsh, enabled = !busy) { Text(stringResource(R.string.node_connect_ssh)) }
                 }
             }
         }

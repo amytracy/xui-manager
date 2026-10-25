@@ -9,6 +9,7 @@ import dev.autorasqr.xuimanager.data.panel.PanelApi
 import dev.autorasqr.xuimanager.data.panel.PanelApiFactory
 import dev.autorasqr.xuimanager.data.panel.PanelCredentials
 import dev.autorasqr.xuimanager.data.panel.PanelEndpoint
+import dev.autorasqr.xuimanager.data.panel.PanelInbound
 import dev.autorasqr.xuimanager.data.panel.PanelVersion
 import dev.autorasqr.xuimanager.data.panel.SubscriptionUpdate
 import dev.autorasqr.xuimanager.data.panel.X25519Keys
@@ -123,31 +124,48 @@ class PanelProvisioner @Inject constructor(
         result: DeployResult,
         log: (String) -> Unit,
     ): ProvisionOutcome {
-        val warnings = mutableSetOf<DeployWarning>()
-        var subscription = api.subscriptionSettings()
-        if (!subscription.enabled) {
+        if (!api.subscriptionSettings().enabled) {
             log("Subscriptions were off; turning them on so the app can share links")
             api.updateSubscriptionSettings(SubscriptionUpdate(enabled = true, port = null, path = null, certFile = null, keyFile = null))
             api.restartPanel()
             delay(4_000)
             waitUntilReady(api)
-            subscription = api.subscriptionSettings()
         }
+        return describe(api, host, version, result.panelPort, webBasePath, params.panelUsername, selfstealPort = null, log = log)
+    }
+
+    /**
+     * What the app records about a panel it finds already set up (adopted or restored): read from the panel as it is,
+     * nothing is changed.
+     */
+    suspend fun describe(
+        api: PanelApi,
+        host: String,
+        version: String,
+        port: Int,
+        webBasePath: String,
+        username: String,
+        selfstealPort: Int?,
+        log: (String) -> Unit,
+    ): ProvisionOutcome {
+        val warnings = mutableSetOf<DeployWarning>()
+        val subscription = api.subscriptionSettings()
         if (!subscription.tls) warnings += DeployWarning.SUBSCRIPTION_PLAIN_HTTP
         val inbounds = api.listInbounds()
         log("Found ${inbounds.size} inbound(s); none were changed")
         return ProvisionOutcome(
             panel = PanelInfo(
                 version = version,
-                port = result.panelPort,
+                port = port,
                 webBasePath = webBasePath,
-                username = params.panelUsername,
+                username = username,
                 subScheme = subscription.scheme,
                 subPort = subscription.port,
                 subPath = subscription.path,
-                defaultInboundId = inbounds.firstOrNull { it.protocol in CLIENT_PROTOCOLS }?.id,
+                defaultInboundId = defaultInbound(inbounds)?.id,
                 deployedAt = System.currentTimeMillis(),
                 host = host,
+                selfstealPort = selfstealPort,
             ),
             warnings = warnings,
         )
@@ -177,7 +195,7 @@ class PanelProvisioner @Inject constructor(
         }
     }
 
-    private suspend fun waitUntilReady(api: PanelApi) {
+    suspend fun waitUntilReady(api: PanelApi) {
         val deadline = System.currentTimeMillis() + 90_000
         var lastError: Throwable? = null
         while (System.currentTimeMillis() < deadline) {
@@ -197,7 +215,16 @@ class PanelProvisioner @Inject constructor(
         throw lastError ?: AppException(AppError.PanelStartFailed)
     }
 
-    private companion object {
-        val CLIENT_PROTOCOLS = setOf("vless", "vmess", "trojan", "shadowsocks")
+    companion object {
+        private val CLIENT_PROTOCOLS = setOf("vless", "vmess", "trojan", "shadowsocks")
+
+        /** The inbound new clients go to: one the app created, otherwise the first that can have clients. */
+        fun defaultInbound(inbounds: List<PanelInbound>): PanelInbound? {
+            val own = inbounds.filter { it.nodeId == null }
+            return own.firstOrNull { it.remark == DeployConfig.SELFSTEAL_REMARK }
+                ?: own.firstOrNull { it.remark == DeployConfig.INBOUND_REMARK }
+                ?: own.firstOrNull { it.protocol in CLIENT_PROTOCOLS }
+                ?: inbounds.firstOrNull { it.protocol in CLIENT_PROTOCOLS }
+        }
     }
 }
