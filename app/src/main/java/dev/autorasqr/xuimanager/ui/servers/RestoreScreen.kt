@@ -18,17 +18,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.autorasqr.xuimanager.R
 import dev.autorasqr.xuimanager.domain.model.DeployState
+import dev.autorasqr.xuimanager.ui.common.AppTopBar
 import dev.autorasqr.xuimanager.ui.common.JobLog
+import dev.autorasqr.xuimanager.ui.common.appBarScrollBehavior
 
 /** Connects the app to the panel already set up on the server (after a phone change) without deploying it again. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,9 +45,12 @@ fun RestoreScreen(
     val deployRunning by viewModel.deployRunning.collectAsStateWithLifecycle()
     val job = progress
 
+    val appBarScroll = appBarScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(appBarScroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            AppTopBar(
+                scrollBehavior = appBarScroll,
                 title = { Text(stringResource(R.string.restore_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

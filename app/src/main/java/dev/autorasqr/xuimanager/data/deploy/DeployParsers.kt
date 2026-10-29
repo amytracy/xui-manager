@@ -184,6 +184,7 @@ object DeployExitCodes {
             "E_UNINSTALL" -> AppError.UninstallFailed
             "E_RESTORE_MISSING" -> AppError.RestoreNoPanel
             "E_RESTORE_CERT" -> AppError.RestoreNoTrustedCert
+            "E_REBOOT" -> AppError.RebootFailed(detail)
             else -> AppError.Unexpected(code)
         }
     }

@@ -21,6 +21,7 @@ import dev.autorasqr.xuimanager.data.panel.PanelUpdateInfo
 import dev.autorasqr.xuimanager.data.panel.PanelUpdateRun
 import dev.autorasqr.xuimanager.data.panel.RealityTargetVerdict
 import dev.autorasqr.xuimanager.data.panel.RemoteInboundOption
+import dev.autorasqr.xuimanager.domain.model.SubBalancer
 import dev.autorasqr.xuimanager.data.panel.SubscriptionSettings
 import dev.autorasqr.xuimanager.data.panel.SubscriptionUpdate
 import dev.autorasqr.xuimanager.data.panel.VlessEncAuth
@@ -34,6 +35,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -314,6 +316,27 @@ internal class V3PanelApi(
             .map { NodeUpdateResult(it.id, it.name, it.ok, it.error) }
     }
 
+    override suspend fun subBalancers(): List<SubBalancer> =
+        (call { service.subBalancers() } as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(::subBalancerFrom) }
+
+    override suspend fun saveSubBalancer(balancer: SubBalancer) {
+        // xray ignores costs on every strategy but leastLoad, and the panel's own form never sends them there.
+        val weights = balancer.memberWeights.filterValues { it > 0 }.takeIf { balancer.strategy == "leastLoad" && it.isNotEmpty() }
+            ?.let { w -> JsonObject(w.entries.associate { (id, weight) -> id.toString() to JsonPrimitive(weight) }).toString() }
+        val remark = balancer.remark.trim()
+        if (balancer.id > 0) {
+            call {
+                service.updateSubBalancer(balancer.id, remark, balancer.strategy, balancer.sortOrder, balancer.enabled, balancer.inboundIds, weights)
+            }
+        } else {
+            call { service.addSubBalancer(remark, balancer.strategy, balancer.sortOrder, balancer.enabled, balancer.inboundIds, weights) }
+        }
+    }
+
+    override suspend fun deleteSubBalancer(id: Int) {
+        call { service.deleteSubBalancer(id) }
+    }
+
     override suspend fun panelUpdateInfo(): PanelUpdateInfo {
         val dto = PanelJson.decode<V3PanelUpdateInfo?>(json, call { service.panelUpdateInfo() })
             ?: throw AppException(AppError.PanelError("empty update info"))
@@ -384,6 +407,23 @@ internal class V3PanelApi(
             uptimeSeconds = uptimeSecs, xrayState = xrayState, xrayVersion = xrayVersion, xrayError = xrayError,
             panelVersion = panelVersion,
         )
+
+        internal fun subBalancerFrom(o: JsonObject): SubBalancer? {
+            val id = o.int("id") ?: return null
+            val weights = PanelJson.objectOrNull(Json, o["memberWeights"]).orEmpty().mapNotNull { (key, value) ->
+                val weight = (value as? JsonPrimitive)?.doubleOrNull ?: return@mapNotNull null
+                key.toIntOrNull()?.let { it to weight }
+            }.toMap()
+            return SubBalancer(
+                id = id,
+                remark = o.string("remark").orEmpty(),
+                strategy = o.string("strategy")?.takeIf { it.isNotBlank() } ?: "random",
+                inboundIds = (o["inboundIds"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.intOrNull },
+                memberWeights = weights,
+                sortOrder = o.int("sortOrder") ?: 1,
+                enabled = o.bool("enabled") ?: true,
+            )
+        }
 
         internal fun subscriptionFrom(all: JsonObject) = SubscriptionSettings(
             enabled = all.bool("subEnable") ?: false,

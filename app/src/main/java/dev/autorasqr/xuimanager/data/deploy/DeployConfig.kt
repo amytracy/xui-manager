@@ -26,6 +26,10 @@ object DeployConfig {
     /** apt may first wait up to 10 min for unattended-upgrades to release its lock. */
     const val SYSUPDATE_TIMEOUT_MS = 40 * 60_000L
     const val UNINSTALL_TIMEOUT_MS = 15 * 60_000L
+    const val REBOOT_SCRIPT_TIMEOUT_MS = 3 * 60_000L
+    /** How long a rebooting server may stay away before the app gives up following it. */
+    const val REBOOT_WAIT_MS = 6 * 60_000L
+    const val REBOOT_PANEL_WAIT_MS = 2 * 60_000L
 
     const val POLL_INTERVAL_MS = 1_500L
     const val MAX_LOG_LINES = 3_000

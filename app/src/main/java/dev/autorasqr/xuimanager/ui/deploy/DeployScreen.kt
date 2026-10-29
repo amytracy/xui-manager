@@ -53,7 +53,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
@@ -83,11 +83,13 @@ import dev.autorasqr.xuimanager.domain.model.ExistingInstallAction
 import dev.autorasqr.xuimanager.domain.model.InboundProtocol
 import dev.autorasqr.xuimanager.domain.model.InboundSecurity
 import dev.autorasqr.xuimanager.domain.model.ValidationField
+import dev.autorasqr.xuimanager.ui.common.AppTopBar
 import dev.autorasqr.xuimanager.ui.common.FingerprintField
 import dev.autorasqr.xuimanager.ui.common.HostKeyDialog
 import dev.autorasqr.xuimanager.ui.common.SelectField
 import dev.autorasqr.xuimanager.ui.common.SitePageField
 import dev.autorasqr.xuimanager.ui.common.SniField
+import dev.autorasqr.xuimanager.ui.common.appBarScrollBehavior
 import dev.autorasqr.xuimanager.ui.common.label
 import dev.autorasqr.xuimanager.ui.common.labelRes
 import dev.autorasqr.xuimanager.ui.common.message
@@ -114,9 +116,12 @@ fun DeployScreen(
         }
     }
 
+    val appBarScroll = appBarScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(appBarScroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            AppTopBar(
+                scrollBehavior = appBarScroll,
                 title = { Text(stringResource(if (state.server?.isNode == true) R.string.deploy_node_title else R.string.deploy_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

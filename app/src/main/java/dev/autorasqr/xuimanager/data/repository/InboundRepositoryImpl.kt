@@ -67,8 +67,12 @@ class InboundRepositoryImpl @Inject constructor(
         // Node names are a nicety: an unreachable node list must not hide the inbounds.
         val nodes = if (api.capabilities.nodes) runCatching { nodeChoices(serverId, api) }.getOrDefault(emptyList()) else emptyList()
         val names = nodes.associate { it.id to it.name }
+        val nodeServers = serverDao.nodesOf(serverId).map { it.toDomain() }.filter { it.nodeId != null && it.panel != null }
         InboundsSnapshot(
-            items = inbounds.map { it.toItem(server, it.nodeId?.let { id -> names[id] ?: "#$id" }) },
+            items = inbounds.map { ib ->
+                val nodeServer = ib.nodeId?.let { id -> nodeServers.firstOrNull { it.nodeId == id } }
+                ib.toItem(server, ib.nodeId?.let { id -> names[id] ?: "#$id" }, nodeServer)
+            },
             canCheckSni = api.capabilities.realityScan,
             domain = server.domain,
             selfStealPort = server.panel?.selfstealPort,
@@ -148,9 +152,10 @@ class InboundRepositoryImpl @Inject constructor(
             inboundId
         }
 
-    override fun updateSitePage(serverId: Long, sitePage: ByteArray?) =
+    override fun updateSitePage(serverId: Long, sitePage: ByteArray?, siteServerId: Long) =
         startSelfSteal(serverId, SelfStealAction.PAGE) { log ->
-            val server = serverDao.get(serverId)?.toDomain() ?: throw AppException(AppError.Unexpected("server not found"))
+            val server = serverDao.get(siteServerId)?.toDomain() ?: throw AppException(AppError.Unexpected("server not found"))
+            if (siteServerId != serverId) log("Decoy site of ${server.name} (${server.host})")
             val domain = server.domain ?: throw AppException(AppError.SelfStealFailed(SelfStealIssue.NO_DOMAIN))
             runSelfStealScript(server, "page", domain, log, sitePage)
             log(if (sitePage != null) "Your page is on the decoy site" else "The decoy site has a new random page")
@@ -231,27 +236,32 @@ class InboundRepositoryImpl @Inject constructor(
     }
 
     private fun fingerprint(value: String) = value.takeIf { it in Fingerprints.all } ?: Fingerprints.all.first()
+}
 
-    private fun PanelInbound.toItem(server: Server, nodeName: String?): InboundItem {
-        val reality = reality
-        // The decoy site belongs to this server; a node's loopback target is that node's business.
-        val selfSteal = nodeId == null && reality != null && reality.isLoopback &&
-            (reality.targetPort == server.panel?.selfstealPort || server.domain?.let { it in reality.serverNames } == true)
-        return InboundItem(
-            id = id,
-            remark = remark,
-            protocol = protocol,
-            network = network,
-            security = security,
-            port = port,
-            enabled = enabled,
-            up = up,
-            down = down,
-            clientCount = clientCount,
-            reality = reality?.let { RealityView(it.serverNames.firstOrNull().orEmpty(), it.target, it.fingerprint) },
-            selfSteal = selfSteal,
-            nodeId = nodeId,
-            nodeName = nodeName,
-        )
-    }
+/** [nodeServer] is the node's own server in the app, when the inbound is on a node the app reaches over SSH. */
+internal fun PanelInbound.toItem(server: Server, nodeName: String?, nodeServer: Server? = null): InboundItem {
+    val reality = reality
+    // The decoy site belongs to the server running the inbound: this one, or the node's own server; a node the
+    // app can't reach keeps its loopback target to itself.
+    val host = if (nodeId == null) server else nodeServer
+    val selfSteal = host != null && reality != null && reality.isLoopback &&
+        (reality.targetPort == host.panel?.selfstealPort || host.domain?.let { it in reality.serverNames } == true)
+    return InboundItem(
+        id = id,
+        remark = remark,
+        protocol = protocol,
+        network = network,
+        security = security,
+        port = port,
+        enabled = enabled,
+        up = up,
+        down = down,
+        clientCount = clientCount,
+        reality = reality?.let { RealityView(it.serverNames.firstOrNull().orEmpty(), it.target, it.fingerprint) },
+        selfSteal = selfSteal,
+        nodeId = nodeId,
+        nodeName = nodeName,
+        siteServerId = host?.id?.takeIf { selfSteal },
+        siteDomain = host?.domain?.takeIf { selfSteal },
+    )
 }

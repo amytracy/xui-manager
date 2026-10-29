@@ -55,6 +55,8 @@ data class EditorUiState(
     val fallbackChildren: List<Opt> = emptyList(),
     val scan: ScanSummary? = null,
     val saved: Boolean = false,
+    /** Saved, but a follow-up step failed: shown before the editor closes. */
+    val savedWarning: AppError? = null,
     val nodes: List<NodeChoice> = emptyList(),
 ) {
     val dirty: Boolean get() = draft != original || fallbacks != originalFallbacks
@@ -258,7 +260,9 @@ class InboundEditorViewModel @Inject constructor(
         _state.update { it.copy(saving = true, error = null) }
         viewModelScope.launch {
             try {
-                val fallbacks = if (InboundCapabilities.isFallbackHost(draft)) {
+                // Untouched fallbacks are not sent again: one call less that can fail after the inbound is saved.
+                val changed = if (isNew) s.fallbacks.isNotEmpty() else s.fallbacks != s.originalFallbacks
+                val fallbacks = if (InboundCapabilities.isFallbackHost(draft) && changed) {
                     s.fallbacks.filter { it.childId != null || it.dest.isNotBlank() }.mapIndexed { index, row -> rowToPanel(row, index) }
                 } else {
                     null
@@ -268,7 +272,12 @@ class InboundEditorViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, error = e.asAppError()) }
+                val error = e.asAppError()
+                if (error is AppError.InboundSavedWithWarning) {
+                    _state.update { it.copy(saving = false, saved = true, savedWarning = error) }
+                } else {
+                    _state.update { it.copy(saving = false, error = error) }
+                }
             }
         }
     }

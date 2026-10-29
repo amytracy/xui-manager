@@ -35,7 +35,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -44,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -55,7 +55,9 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import dev.autorasqr.xuimanager.R
 import dev.autorasqr.xuimanager.domain.model.PanelWebSession
+import dev.autorasqr.xuimanager.ui.common.AppTopBar
 import dev.autorasqr.xuimanager.ui.common.SecureScreen
+import dev.autorasqr.xuimanager.ui.common.appBarScrollBehavior
 import dev.autorasqr.xuimanager.ui.common.message
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
@@ -76,9 +78,14 @@ fun PanelScreen(
 
     BackHandler(enabled = canGoBack) { webView?.goBack() }
 
+    val appBarScroll = appBarScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(appBarScroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            AppTopBar(
+                scrollBehavior = appBarScroll,
+                // The web page scrolls inside the WebView and never folds a large header away.
+                large = false,
                 title = { Text((state as? PanelUiState.Ready)?.session?.serverName ?: stringResource(R.string.panel_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

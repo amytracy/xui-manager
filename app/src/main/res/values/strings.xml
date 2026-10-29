@@ -524,4 +524,37 @@
     <string name="restore_deploy_running">A deployment is running on this server. Wait for it to finish.</string>
     <string name="error_restore_no_panel">3x-ui is not installed on this server. Deploy it instead.</string>
     <string name="error_restore_cert">The panel has no valid Let\'s Encrypt certificate, so the app can\'t connect to it safely. Use Deploy → \"Take over as is\", which issues one.</string>
+    <string name="error_inbound_saved_update">The panel answered with an error, but the inbound is saved. %1$s</string>
+    <string name="error_inbound_saved_fallbacks">The inbound is saved, but its fallbacks were not. %1$s</string>
+    <string name="error_inbound_saved_xray">The inbound is saved, but Xray did not restart. %1$s Restart Xray on the server screen.</string>
+    <string name="error_reboot">The server could not schedule the restart. Details are in the log.</string>
+    <string name="error_reboot_timeout">The server did not come back within 6 minutes. Check it in your hosting provider\'s control panel.</string>
+    <string name="action_restart_panel">Restart panel</string>
+    <string name="action_reboot_server">Reboot server</string>
+    <string name="action_reboot_short">Reboot</string>
+    <string name="panel_restart_title">Restart the panel?</string>
+    <string name="panel_restart_text">3x-ui restarts and is back in about 10 seconds. VPN connections may drop for a few seconds.</string>
+    <string name="panel_restart_confirm">Restart</string>
+    <string name="panel_restarting">The panel is restarting…</string>
+    <string name="panel_restarted">The panel has restarted</string>
+    <string name="reboot_confirm_title">Reboot the server?</string>
+    <string name="reboot_confirm_text">%1$s restarts right away. VPN connections through it drop for 1–2 minutes.</string>
+    <string name="reboot_confirm">Reboot</string>
+    <string name="reboot_running">Rebooting the server…</string>
+    <string name="reboot_done">The server has rebooted and is back online</string>
+    <string name="reboot_failed">Reboot failed</string>
+    <string name="action_subscription">Subscription settings</string>
+    <string name="tab_overview">Overview</string>
+    <string name="tab_more">More</string>
+    <string name="more_routing_text">Russian services bypass the VPN</string>
+    <string name="more_subscription_text">Links, formats and client routing</string>
+    <string name="more_open_panel_text">The 3x-ui web interface</string>
+    <string name="more_server_settings_text">Name, address, SSH, domain</string>
+    <string name="more_appearance_text">Material You or One UI</string>
+    <string name="appearance_title">Appearance</string>
+    <string name="appearance_style">Style</string>
+    <string name="style_material_you" translatable="false">Material You</string>
+    <string name="style_material_you_text">Colours from your wallpaper, compact top bars</string>
+    <string name="style_one_ui" translatable="false">One UI</string>
+    <string name="style_one_ui_text">Large titles that fold away as you scroll, rounder blocks, blue accent</string>
 </resources>

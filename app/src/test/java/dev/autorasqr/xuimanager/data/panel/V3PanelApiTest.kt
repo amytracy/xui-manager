@@ -6,6 +6,7 @@ import dev.autorasqr.xuimanager.domain.model.AppError
 import dev.autorasqr.xuimanager.domain.model.AppException
 import dev.autorasqr.xuimanager.domain.model.InboundProtocol
 import dev.autorasqr.xuimanager.domain.model.InboundTransport
+import dev.autorasqr.xuimanager.domain.model.SubBalancer
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -526,5 +527,38 @@ class V3PanelApiTest {
     fun `a status file the panel has not written yet reads as pending`() = runBlocking {
         respond("""{"success":true,"obj":{"runId":"","state":"","exitCode":0,"finishedAt":0}}""")
         assertEquals(PanelUpdateRun("", "pending", 0), api().panelUpdateStatus())
+    }
+
+    @Test
+    fun `subscription balancers are read as JSON and saved as form fields`() = runBlocking {
+        respond(
+            """{"success":true,"obj":[{"id":4,"remark":"Auto","strategy":"leastLoad","inboundIds":[3,7],
+               "memberWeights":{"3":0.5},"sortOrder":2,"enabled":true,"createdAt":1,"updatedAt":2}]}""",
+        )
+        respond("""{"success":true,"obj":{"id":4}}""")
+        respond("""{"success":true,"obj":{"id":5}}""")
+        respond("""{"success":true,"obj":{"id":4}}""")
+
+        val api = api()
+        val balancer = api.subBalancers().single()
+        assertEquals(SubBalancer(4, "Auto", "leastLoad", listOf(3, 7), mapOf(3 to 0.5), 2, true), balancer)
+        api.saveSubBalancer(balancer.copy(enabled = false))
+        api.saveSubBalancer(balancer.copy(id = 0, strategy = "random"))
+        api.deleteSubBalancer(4)
+
+        server.takeRequest().let { assertEquals("GET" to "/s3cretPath/panel/api/sub-balancers", it.method to it.url.encodedPath) }
+        server.takeRequest().let {
+            assertEquals("/s3cretPath/panel/api/sub-balancers/4", it.url.encodedPath)
+            assertEquals(
+                "remark=Auto&strategy=leastLoad&sortOrder=2&enabled=false&inboundIds=3&inboundIds=7&memberWeights=%7B%223%22%3A0.5%7D",
+                it.body!!.utf8(),
+            )
+        }
+        // Weights are dropped for every strategy but leastLoad, as in the panel's own form.
+        server.takeRequest().let {
+            assertEquals("/s3cretPath/panel/api/sub-balancers", it.url.encodedPath)
+            assertEquals("remark=Auto&strategy=random&sortOrder=2&enabled=true&inboundIds=3&inboundIds=7", it.body!!.utf8())
+        }
+        server.takeRequest().let { assertEquals("POST" to "/s3cretPath/panel/api/sub-balancers/4/del", it.method to it.url.encodedPath) }
     }
 }

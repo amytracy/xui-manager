@@ -39,8 +39,8 @@ android {
         applicationId = "dev.autorasqr.xuimanager"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.13.0"
+        versionCode = 15
+        versionName = "0.15.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

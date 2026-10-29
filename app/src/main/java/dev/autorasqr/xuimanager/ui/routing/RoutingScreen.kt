@@ -30,11 +30,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
@@ -45,7 +45,9 @@ import dev.autorasqr.xuimanager.R
 import dev.autorasqr.xuimanager.domain.model.ClientRouting
 import dev.autorasqr.xuimanager.domain.model.DeployState
 import dev.autorasqr.xuimanager.domain.model.RoutingJobProgress
+import dev.autorasqr.xuimanager.ui.common.AppTopBar
 import dev.autorasqr.xuimanager.ui.common.JobLog
+import dev.autorasqr.xuimanager.ui.common.appBarScrollBehavior
 import dev.autorasqr.xuimanager.ui.common.message
 import dev.autorasqr.xuimanager.ui.theme.LocalStatusColors
 
@@ -56,9 +58,12 @@ fun RoutingScreen(
     viewModel: RoutingViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.state.collectAsStateWithLifecycle()
+    val appBarScroll = appBarScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(appBarScroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            AppTopBar(
+                scrollBehavior = appBarScroll,
                 title = { Text(stringResource(R.string.routing_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

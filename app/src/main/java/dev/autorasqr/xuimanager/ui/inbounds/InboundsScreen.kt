@@ -41,7 +41,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.Alignment
@@ -68,18 +68,21 @@ import dev.autorasqr.xuimanager.domain.model.InboundItem
 import dev.autorasqr.xuimanager.domain.model.SelfStealAction
 import dev.autorasqr.xuimanager.domain.model.SelfStealProgress
 import dev.autorasqr.xuimanager.domain.model.ValidationField
+import dev.autorasqr.xuimanager.ui.common.AppTopBar
 import dev.autorasqr.xuimanager.ui.common.FingerprintField
 import dev.autorasqr.xuimanager.ui.common.Formatters
 import dev.autorasqr.xuimanager.ui.common.SitePageChoice
 import dev.autorasqr.xuimanager.ui.common.SitePageField
 import dev.autorasqr.xuimanager.ui.common.SniField
+import dev.autorasqr.xuimanager.ui.common.appBarScrollBehavior
 import dev.autorasqr.xuimanager.ui.common.message
 import dev.autorasqr.xuimanager.ui.theme.LocalStatusColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboundsScreen(
-    onBack: () -> Unit,
+    /** Null when the screen is a tab of the server screen. */
+    onBack: (() -> Unit)?,
     /** Opens the full editor; null creates a new inbound. */
     onEditor: (Int?) -> Unit,
     viewModel: InboundsViewModel = hiltViewModel(),
@@ -101,13 +104,18 @@ fun InboundsScreen(
         snackbar.showSnackbar(resources.getString(message))
     }
 
+    val appBarScroll = appBarScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(appBarScroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            AppTopBar(
+                scrollBehavior = appBarScroll,
                 title = { Text(stringResource(R.string.inbounds_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                        }
                     }
                 },
                 actions = {
@@ -157,10 +165,13 @@ fun InboundsScreen(
                     }
                     // The app may not know the site's port (adopted panel, older app version), but a self-steal inbound
                     // means the site is there; the script refuses a server without one anyway.
-                    val siteInstalled = snapshot.selfStealPort != null || snapshot.items.any { it.selfSteal }
-                    if (siteInstalled && snapshot.domain != null) {
+                    val siteInstalled = snapshot.selfStealPort != null || snapshot.items.any { it.selfSteal && it.nodeId == null }
+                    // Self-steal inbounds change the page from their own card; this card is only the fallback for a
+                    // site kept after its last inbound was deleted.
+                    val pageOnCard = snapshot.items.any { it.selfSteal && it.siteServerId == viewModel.serverId }
+                    if (siteInstalled && snapshot.domain != null && !pageOnCard) {
                         item(key = "decoy") {
-                            DecoySiteCard(snapshot.domain, enabled = !viewModel.selfStealRunning, onChangePage = viewModel::openSitePage)
+                            DecoySiteCard(snapshot.domain, enabled = !viewModel.selfStealRunning, onChangePage = { viewModel.openSitePage() })
                         }
                     }
                     state.error?.let { error ->
@@ -184,7 +195,11 @@ fun InboundsScreen(
                             onEdit = { viewModel.openEditReality(item) },
                             onAdvanced = { onEditor(item.id) },
                             onDelete = { viewModel.requestDelete(item) },
-                            onSitePage = if (item.selfSteal && snapshot.domain != null && !viewModel.selfStealRunning) viewModel::openSitePage else null,
+                            onSitePage = if (item.selfSteal && item.siteDomain != null && !viewModel.selfStealRunning) {
+                                { viewModel.openSitePage(item) }
+                            } else {
+                                null
+                            },
                         )
                     }
                 }
@@ -208,7 +223,7 @@ fun InboundsScreen(
         SelfStealDialog(form, domain = state.snapshot?.domain.orEmpty(), viewModel = viewModel)
     }
     state.sitePageForm?.let { page ->
-        SitePageDialog(page, domain = state.snapshot?.domain.orEmpty(), viewModel = viewModel)
+        SitePageDialog(page, domain = state.sitePageTarget?.domain.orEmpty(), viewModel = viewModel)
     }
     state.confirmDelete?.let { item ->
         AlertDialog(

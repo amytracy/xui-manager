@@ -168,6 +168,36 @@ interface V3PanelService {
     @POST("panel/api/nodes/updatePanel")
     suspend fun updateNodePanels(@Body body: JsonObject): ResponseBody
 
+    @GET("panel/api/sub-balancers")
+    suspend fun subBalancers(): ResponseBody
+
+    /** Form fields only (the panel parses no JSON here); inboundIds repeats, memberWeights is a JSON object. */
+    @FormUrlEncoded
+    @POST("panel/api/sub-balancers")
+    suspend fun addSubBalancer(
+        @Field("remark") remark: String,
+        @Field("strategy") strategy: String,
+        @Field("sortOrder") sortOrder: Int,
+        @Field("enabled") enabled: Boolean,
+        @Field("inboundIds") inboundIds: List<Int>,
+        @Field("memberWeights") memberWeights: String?,
+    ): ResponseBody
+
+    @FormUrlEncoded
+    @POST("panel/api/sub-balancers/{id}")
+    suspend fun updateSubBalancer(
+        @Path("id") id: Int,
+        @Field("remark") remark: String,
+        @Field("strategy") strategy: String,
+        @Field("sortOrder") sortOrder: Int,
+        @Field("enabled") enabled: Boolean,
+        @Field("inboundIds") inboundIds: List<Int>,
+        @Field("memberWeights") memberWeights: String?,
+    ): ResponseBody
+
+    @POST("panel/api/sub-balancers/{id}/del")
+    suspend fun deleteSubBalancer(@Path("id") id: Int): ResponseBody
+
     @GET("panel/api/server/getPanelUpdateInfo")
     suspend fun panelUpdateInfo(): ResponseBody
 

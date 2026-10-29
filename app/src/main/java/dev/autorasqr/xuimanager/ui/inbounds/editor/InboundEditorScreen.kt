@@ -31,7 +31,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +40,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -53,6 +53,8 @@ import dev.autorasqr.xuimanager.data.inbound.editor.EditorTab
 import dev.autorasqr.xuimanager.data.inbound.editor.InboundCapabilities
 import dev.autorasqr.xuimanager.data.inbound.editor.InboundDraft
 import dev.autorasqr.xuimanager.domain.model.NodeChoice
+import dev.autorasqr.xuimanager.ui.common.AppTopBar
+import dev.autorasqr.xuimanager.ui.common.appBarScrollBehavior
 import dev.autorasqr.xuimanager.ui.common.message
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,7 +69,7 @@ fun InboundEditorScreen(
     var confirmLeave by rememberSaveable { mutableStateOf(false) }
     val ru = LocalConfiguration.current.locales[0].language == "ru"
 
-    LaunchedEffect(ui.saved) { if (ui.saved) onSaved() }
+    LaunchedEffect(ui.saved) { if (ui.saved && ui.savedWarning == null) onSaved() }
     LaunchedEffect(ui.notice) {
         val notice = ui.notice ?: return@LaunchedEffect
         viewModel.consumeNotice()
@@ -75,9 +77,12 @@ fun InboundEditorScreen(
     }
     BackHandler(enabled = ui.dirty && !ui.saved) { confirmLeave = true }
 
+    val appBarScroll = appBarScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(appBarScroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            AppTopBar(
+                scrollBehavior = appBarScroll,
                 title = {
                     Text(
                         if (viewModel.isNew) Txt("New inbound", "Новый инбаунд").text()
@@ -145,6 +150,15 @@ fun InboundEditorScreen(
                 }
             }
         }
+    }
+
+    ui.savedWarning?.let { warning ->
+        AlertDialog(
+            onDismissRequest = onSaved,
+            title = { Text(Txt("Inbound saved", "Инбаунд сохранён").text()) },
+            text = { Text(warning.message()) },
+            confirmButton = { TextButton(onClick = onSaved) { Text(stringResource(R.string.close)) } },
+        )
     }
 
     if (confirmLeave) {

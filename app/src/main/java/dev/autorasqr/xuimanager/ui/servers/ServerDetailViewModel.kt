@@ -11,6 +11,7 @@ import dev.autorasqr.xuimanager.domain.model.DeployState
 import dev.autorasqr.xuimanager.domain.model.PanelLogin
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateOffer
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateProgress
+import dev.autorasqr.xuimanager.domain.model.RebootProgress
 import dev.autorasqr.xuimanager.domain.model.Server
 import dev.autorasqr.xuimanager.domain.model.ServerStatus
 import dev.autorasqr.xuimanager.domain.model.SystemUpdateProgress
@@ -21,6 +22,7 @@ import dev.autorasqr.xuimanager.domain.repository.AppUpdateRepository
 import dev.autorasqr.xuimanager.domain.repository.DeployRepository
 import dev.autorasqr.xuimanager.domain.repository.PanelStatusRepository
 import dev.autorasqr.xuimanager.domain.repository.PanelUpdateRepository
+import dev.autorasqr.xuimanager.domain.repository.ServerPowerRepository
 import dev.autorasqr.xuimanager.domain.repository.ServerRepository
 import dev.autorasqr.xuimanager.domain.repository.SystemUpdateRepository
 import dev.autorasqr.xuimanager.domain.repository.XrayUpdateRepository
@@ -52,6 +54,9 @@ data class StatusUiState(
     val restarting: Boolean = false,
     /** True right after a successful restart, until the next refresh. */
     val restarted: Boolean = false,
+    val confirmPanelRestart: Boolean = false,
+    val panelRestarting: Boolean = false,
+    val panelRestarted: Boolean = false,
 )
 
 /** What the update checks found; null while a check has not finished yet. */
@@ -82,6 +87,7 @@ class ServerDetailViewModel @Inject constructor(
     private val systemUpdates: SystemUpdateRepository,
     private val xrayUpdates: XrayUpdateRepository,
     private val appUpdates: AppUpdateRepository,
+    private val power: ServerPowerRepository,
 ) : ViewModel() {
     val serverId: Long = savedStateHandle.toRoute<ServerDetailRoute>().serverId
 
@@ -107,6 +113,11 @@ class ServerDetailViewModel @Inject constructor(
     val panelUpdate: StateFlow<PanelUpdateProgress?> = panelUpdates.progress(serverId)
     val xrayUpdate: StateFlow<XrayUpdateProgress?> = xrayUpdates.progress(serverId)
     val systemUpdate: StateFlow<SystemUpdateProgress?> = systemUpdates.progress(serverId)
+
+    val reboot: StateFlow<RebootProgress?> = power.rebootProgress(serverId)
+
+    private val _confirmReboot = MutableStateFlow(false)
+    val confirmReboot: StateFlow<Boolean> = _confirmReboot.asStateFlow()
 
     private val _confirmSystemUpdate = MutableStateFlow(false)
     val confirmSystemUpdate: StateFlow<Boolean> = _confirmSystemUpdate.asStateFlow()
@@ -272,12 +283,50 @@ class ServerDetailViewModel @Inject constructor(
         }
     }
 
+    fun requestPanelRestart() = _status.update { it.copy(confirmPanelRestart = true) }
+    fun dismissPanelRestart() = _status.update { it.copy(confirmPanelRestart = false) }
+
+    fun restartPanel() {
+        _status.update { it.copy(confirmPanelRestart = false, panelRestarting = true, panelRestarted = false) }
+        viewModelScope.launch {
+            try {
+                power.restartPanel(serverId)
+                _status.update { it.copy(panelRestarting = false, panelRestarted = true, error = null) }
+                loadStatus(keepRestarted = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _status.update { it.copy(panelRestarting = false, error = e.asAppError()) }
+            }
+        }
+    }
+
+    fun requestReboot() {
+        _confirmReboot.value = true
+    }
+
+    fun dismissRebootConfirm() {
+        _confirmReboot.value = false
+    }
+
+    fun startReboot() {
+        _confirmReboot.value = false
+        power.reboot(serverId)
+    }
+
+    fun dismissReboot() = power.clearRebootProgress(serverId)
+
     private suspend fun loadStatus(keepRestarted: Boolean = false) {
         if (server.value?.panel == null) return
         _status.update { it.copy(loading = true) }
         try {
             val status = statusRepository.status(serverId)
-            _status.update { it.copy(status = status, error = null, loading = false, restarted = keepRestarted && it.restarted) }
+            _status.update {
+                it.copy(
+                    status = status, error = null, loading = false,
+                    restarted = keepRestarted && it.restarted, panelRestarted = keepRestarted && it.panelRestarted,
+                )
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

@@ -45,6 +45,10 @@ sealed interface AppError {
     data class XrayUpdateFailed(val detail: String?) : AppError
     /** GitHub did not answer the app's release check as expected; [detail] is the HTTP status or GitHub's message. */
     data class ReleaseCheckFailed(val detail: String?) : AppError
+    /** The inbound is saved on the panel, but [step] reported [cause]; the editor closes and says so. */
+    data class InboundSavedWithWarning(val step: InboundSaveStep, val cause: AppError) : AppError
+    /** reboot.sh could not schedule the restart, or the server did not come back in time ([detail] = "timeout"). */
+    data class RebootFailed(val detail: String?) : AppError
     data object PanelUnauthorized : AppError
     data object PanelNotFound : AppError
     data object PanelNotDeployed : AppError
@@ -56,6 +60,8 @@ sealed interface AppError {
 }
 
 enum class CertificateIssue { PORT_80_BUSY, NO_PUBLIC_ADDRESS, VALIDATION_FAILED }
+
+enum class InboundSaveStep { UPDATE, FALLBACKS, XRAY_RESTART }
 
 enum class SelfStealIssue { DOWNLOAD, CHECKSUM, SETUP, NO_DOMAIN }
 

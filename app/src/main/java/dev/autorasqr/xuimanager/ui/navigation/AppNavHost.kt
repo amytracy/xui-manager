@@ -1,11 +1,13 @@
 package dev.autorasqr.xuimanager.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import dev.autorasqr.xuimanager.ui.appearance.AppearanceScreen
 import dev.autorasqr.xuimanager.ui.clients.ClientsScreen
 import dev.autorasqr.xuimanager.ui.deploy.DeployScreen
 import dev.autorasqr.xuimanager.ui.home.HomeScreen
@@ -15,9 +17,12 @@ import dev.autorasqr.xuimanager.ui.nodes.NodeEditScreen
 import dev.autorasqr.xuimanager.ui.nodes.NodesScreen
 import dev.autorasqr.xuimanager.ui.panel.PanelScreen
 import dev.autorasqr.xuimanager.ui.routing.RoutingScreen
-import dev.autorasqr.xuimanager.ui.servers.ServerDetailScreen
+import dev.autorasqr.xuimanager.ui.servers.MoreScreen
 import dev.autorasqr.xuimanager.ui.servers.RestoreScreen
+import dev.autorasqr.xuimanager.ui.servers.ServerDetailScreen
 import dev.autorasqr.xuimanager.ui.servers.ServerEditScreen
+import dev.autorasqr.xuimanager.ui.servers.ServerHomeScreen
+import dev.autorasqr.xuimanager.ui.subscription.SubscriptionScreen
 import dev.autorasqr.xuimanager.ui.servers.UninstallScreen
 import kotlinx.serialization.Serializable
 
@@ -60,6 +65,9 @@ data class RoutingRoute(val serverId: Long)
 @Serializable
 data class NodesRoute(val serverId: Long)
 
+@Serializable
+data class SubscriptionRoute(val serverId: Long)
+
 /** nodeId = 0 adds a node to the panel of server [serverId]. */
 @Serializable
 data class NodeEditRoute(val serverId: Long, val nodeId: Int = 0)
@@ -75,6 +83,13 @@ data class UninstallRoute(val serverId: Long)
 /** inboundId = 0 creates a new inbound. */
 @Serializable
 data class InboundEditorRoute(val serverId: Long, val inboundId: Int = 0)
+
+/** The "More" tab of the server screen. */
+@Serializable
+data class MoreRoute(val serverId: Long)
+
+@Serializable
+object AppearanceRoute
 
 @Composable
 fun AppNavHost() {
@@ -119,47 +134,62 @@ fun AppNavHost() {
             )
         }
         composable<ServerDetailRoute> {
-            ServerDetailScreen(
-                onEdit = { id -> nav.navigate(ServerEditRoute(id)) },
-                onDeploy = { id -> nav.navigate(DeployRoute(id)) },
-                onClients = { id -> nav.navigate(ClientsRoute(id)) },
-                onInbounds = { id -> nav.navigate(InboundsRoute(id)) },
-                onRouting = { id -> nav.navigate(RoutingRoute(id)) },
-                onNodes = { id -> nav.navigate(NodesRoute(id)) },
-                onOpenPanel = { id -> nav.navigate(PanelRoute(id)) },
-                onRestore = { id -> nav.navigate(RestoreRoute(id)) },
-                // The home server is the root; a node's server screen is opened from the node list.
-                onBack = if (nav.previousBackStackEntry != null) ({ nav.popBackStack() }) else null,
-            )
-        }
-        composable<NodesRoute> {
-            NodesScreen(
-                onBack = { nav.popBackStack() },
-                onAddServer = { masterId -> nav.navigate(ServerEditRoute(masterServerId = masterId)) },
-                onAddPanel = { masterId -> nav.navigate(NodeEditRoute(masterId)) },
-                onEdit = { masterId, nodeId -> nav.navigate(NodeEditRoute(masterId, nodeId)) },
-                onServer = { id -> nav.navigate(ServerDetailRoute(id)) },
-                onDeploy = { id -> nav.navigate(DeployRoute(id)) },
-                onConnectSsh = { masterId, node ->
-                    nav.navigate(ServerEditRoute(masterServerId = masterId, restoreNodeId = node.id, host = node.address, name = node.name))
+            // The home server is the root; a node's server screen is opened from the node list.
+            val canGoBack = remember { nav.previousBackStackEntry != null }
+            // Tabs of the server screen; everything they open goes full screen over them, on the app's own stack.
+            ServerHomeScreen(
+                tabs = {
+                    composable<ServerDetailRoute> {
+                        ServerDetailScreen(
+                            onEdit = { id -> nav.navigate(ServerEditRoute(id)) },
+                            onDeploy = { id -> nav.navigate(DeployRoute(id)) },
+                            onOpenPanel = { id -> nav.navigate(PanelRoute(id)) },
+                            onRestore = { id -> nav.navigate(RestoreRoute(id)) },
+                            onBack = if (canGoBack) ({ nav.popBackStack() }) else null,
+                        )
+                    }
+                    composable<InboundsRoute> { entry ->
+                        val serverId = entry.toRoute<InboundsRoute>().serverId
+                        InboundsScreen(
+                            onBack = null,
+                            onEditor = { inboundId -> nav.navigate(InboundEditorRoute(serverId, inboundId ?: 0)) },
+                        )
+                    }
+                    composable<ClientsRoute> {
+                        ClientsScreen(onBack = null)
+                    }
+                    composable<NodesRoute> {
+                        NodesDestination(nav, onBack = null)
+                    }
+                    composable<MoreRoute> {
+                        MoreScreen(
+                            onRouting = { id -> nav.navigate(RoutingRoute(id)) },
+                            onSubscription = { id -> nav.navigate(SubscriptionRoute(id)) },
+                            onOpenPanel = { id -> nav.navigate(PanelRoute(id)) },
+                            onServerSettings = { id -> nav.navigate(ServerEditRoute(id)) },
+                            onAppearance = { nav.navigate(AppearanceRoute) },
+                        )
+                    }
                 },
             )
         }
+        composable<NodesRoute> {
+            NodesDestination(nav, onBack = { nav.popBackStack() })
+        }
+        composable<AppearanceRoute> {
+            AppearanceScreen(onBack = { nav.popBackStack() })
+        }
         composable<NodeEditRoute> {
             NodeEditScreen(onBack = { nav.popBackStack() }, onSaved = { nav.popBackStack() })
-        }
-        composable<InboundsRoute> { entry ->
-            val serverId = entry.toRoute<InboundsRoute>().serverId
-            InboundsScreen(
-                onBack = { nav.popBackStack() },
-                onEditor = { inboundId -> nav.navigate(InboundEditorRoute(serverId, inboundId ?: 0)) },
-            )
         }
         composable<InboundEditorRoute> {
             InboundEditorScreen(onBack = { nav.popBackStack() }, onSaved = { nav.popBackStack() })
         }
         composable<RoutingRoute> {
             RoutingScreen(onBack = { nav.popBackStack() })
+        }
+        composable<SubscriptionRoute> {
+            SubscriptionScreen(onBack = { nav.popBackStack() })
         }
         composable<PanelRoute> {
             PanelScreen(onBack = { nav.popBackStack() })
@@ -171,7 +201,8 @@ fun AppNavHost() {
                     nav.navigate(ClientsRoute(id)) { popUpTo<DeployRoute> { inclusive = true } }
                 },
                 onNodes = { masterId ->
-                    if (!nav.popBackStack<NodesRoute>(inclusive = false)) {
+                    // Back to the master's server screen, which is still on its Nodes tab.
+                    if (!nav.popBackStack(ServerDetailRoute(masterId), inclusive = false) && !nav.popBackStack<NodesRoute>(inclusive = false)) {
                         nav.navigate(NodesRoute(masterId)) { popUpTo<DeployRoute> { inclusive = true } }
                     }
                 },
@@ -183,11 +214,27 @@ fun AppNavHost() {
     }
 }
 
+@Composable
+private fun NodesDestination(nav: NavHostController, onBack: (() -> Unit)?) {
+    NodesScreen(
+        onBack = onBack,
+        onAddServer = { masterId -> nav.navigate(ServerEditRoute(masterServerId = masterId)) },
+        onAddPanel = { masterId -> nav.navigate(NodeEditRoute(masterId)) },
+        onEdit = { masterId, nodeId -> nav.navigate(NodeEditRoute(masterId, nodeId)) },
+        onServer = { id -> nav.navigate(ServerDetailRoute(id)) },
+        onDeploy = { id -> nav.navigate(DeployRoute(id)) },
+        onConnectSsh = { masterId, node ->
+            nav.navigate(ServerEditRoute(masterServerId = masterId, restoreNodeId = node.id, host = node.address, name = node.name))
+        },
+    )
+}
+
 /** Leaves the screens of a server that is gone from the app. */
 private fun NavHostController.afterServerDeleted(wasNode: Boolean) {
     if (wasNode) {
-        // Back to the master's node list, past the deleted node's own screens.
-        if (!popBackStack<NodesRoute>(inclusive = false)) popBackStack()
+        // Back to the master's Nodes tab (or the node list), past the deleted node's own server screen, which is the
+        // topmost one: node settings are only opened from there.
+        if (!popBackStack<NodesRoute>(inclusive = false) && !popBackStack<ServerDetailRoute>(inclusive = true)) popBackStack()
     } else {
         navigate(HomeRoute) { popUpTo(graph.id) { inclusive = true } }
     }

@@ -49,6 +49,12 @@ object RemoteJob {
         "OWNER_GID" to gid.toString(),
     )
 
+    /** params.env for reboot.sh. */
+    fun rebootEnv(uid: Int, gid: Int): String = env(
+        "OWNER_UID" to uid.toString(),
+        "OWNER_GID" to gid.toString(),
+    )
+
     /** params.env for uninstall.sh: [ports] are closed in the firewall, [sshPort] never is. */
     fun uninstallEnv(uid: Int, gid: Int, sshPort: Int, ports: Collection<Int>): String = env(
         "OWNER_UID" to uid.toString(),

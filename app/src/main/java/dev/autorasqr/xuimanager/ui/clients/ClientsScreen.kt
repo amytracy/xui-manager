@@ -58,7 +58,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -68,6 +67,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -81,10 +81,12 @@ import dev.autorasqr.xuimanager.R
 import dev.autorasqr.xuimanager.domain.model.Client
 import dev.autorasqr.xuimanager.domain.model.InboundSummary
 import dev.autorasqr.xuimanager.domain.model.ValidationField
+import dev.autorasqr.xuimanager.ui.common.AppTopBar
 import dev.autorasqr.xuimanager.ui.common.Clipboard
 import dev.autorasqr.xuimanager.ui.common.Formatters
 import dev.autorasqr.xuimanager.ui.common.QrCode
 import dev.autorasqr.xuimanager.ui.common.SecureScreen
+import dev.autorasqr.xuimanager.ui.common.appBarScrollBehavior
 import dev.autorasqr.xuimanager.ui.common.label
 import dev.autorasqr.xuimanager.ui.common.message
 import dev.autorasqr.xuimanager.ui.common.messageRes
@@ -93,7 +95,8 @@ import dev.autorasqr.xuimanager.ui.theme.LocalStatusColors
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClientsScreen(
-    onBack: () -> Unit,
+    /** Null when the screen is a tab of the server screen. */
+    onBack: (() -> Unit)?,
     viewModel: ClientsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -107,13 +110,18 @@ fun ClientsScreen(
         if (text != null) snackbar.showSnackbar(text)
     }
 
+    val appBarScroll = appBarScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(appBarScroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            AppTopBar(
+                scrollBehavior = appBarScroll,
                 title = { Text(stringResource(R.string.clients_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                        }
                     }
                 },
                 actions = {

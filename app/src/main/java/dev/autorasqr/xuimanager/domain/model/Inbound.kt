@@ -52,6 +52,9 @@ data class InboundItem(
     /** The node hosting the inbound; null for the panel's own inbounds. */
     val nodeId: Int? = null,
     val nodeName: String? = null,
+    /** For self-steal: the server whose decoy site it uses (this one, or the node's own server) and its domain. */
+    val siteServerId: Long? = null,
+    val siteDomain: String? = null,
 ) {
     /** The quick Reality editor handles VLESS over raw TCP with Reality; anything else needs the full editor. */
     val quickEditable: Boolean get() = reality != null && protocol == "vless" && network in setOf("tcp", "raw")

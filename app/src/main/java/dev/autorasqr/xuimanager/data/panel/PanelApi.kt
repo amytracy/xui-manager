@@ -2,6 +2,7 @@ package dev.autorasqr.xuimanager.data.panel
 
 import dev.autorasqr.xuimanager.domain.model.AppError
 import dev.autorasqr.xuimanager.domain.model.AppException
+import dev.autorasqr.xuimanager.domain.model.SubBalancer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -112,6 +113,14 @@ interface PanelApi {
 
     /** Asks the nodes to run the official updater; only enabled, online nodes accept. */
     suspend fun updateNodePanels(ids: List<Int>): List<NodeUpdateResult> = unsupported()
+
+    // --- JSON-subscription balancers (3x-ui v3) ---
+
+    suspend fun subBalancers(): List<SubBalancer> = unsupported()
+
+    /** Creates the balancer when its id is 0, otherwise replaces the stored one. */
+    suspend fun saveSubBalancer(balancer: SubBalancer): Unit = unsupported()
+    suspend fun deleteSubBalancer(id: Int): Unit = unsupported()
 
     // --- panel self-update (3x-ui v3, see [PanelCapabilities.selfUpdate]) ---
 

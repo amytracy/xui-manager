@@ -23,13 +23,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -39,7 +39,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.autorasqr.xuimanager.R
 import dev.autorasqr.xuimanager.domain.model.DeployState
+import dev.autorasqr.xuimanager.ui.common.AppTopBar
 import dev.autorasqr.xuimanager.ui.common.JobLog
+import dev.autorasqr.xuimanager.ui.common.appBarScrollBehavior
 
 /** Removes the panel and everything else the app installed from the server, after the user types "yes". */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,9 +59,12 @@ fun UninstallScreen(
     val server = targets.lastOrNull()
     val nodes = targets.dropLast(1)
 
+    val appBarScroll = appBarScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(appBarScroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            AppTopBar(
+                scrollBehavior = appBarScroll,
                 title = { Text(stringResource(R.string.uninstall_title)) },
                 navigationIcon = {
                     // The job runs on regardless; only a finished one leaves for a screen that may no longer exist.

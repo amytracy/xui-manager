@@ -28,7 +28,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +35,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -48,16 +49,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.autorasqr.xuimanager.BuildConfig
 import dev.autorasqr.xuimanager.R
 import dev.autorasqr.xuimanager.data.deploy.DeployConfig
-import dev.autorasqr.xuimanager.data.panel.PanelVersion
 import dev.autorasqr.xuimanager.domain.model.DeployState
 import dev.autorasqr.xuimanager.domain.model.PanelLogin
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateOffer
 import dev.autorasqr.xuimanager.domain.model.Server
 import dev.autorasqr.xuimanager.domain.model.UpdateCheck
+import dev.autorasqr.xuimanager.ui.common.AppTopBar
 import dev.autorasqr.xuimanager.ui.common.Clipboard
 import dev.autorasqr.xuimanager.ui.common.JobLog
 import dev.autorasqr.xuimanager.ui.common.SecureScreen
 import dev.autorasqr.xuimanager.ui.common.Formatters
+import dev.autorasqr.xuimanager.ui.common.appBarScrollBehavior
 import dev.autorasqr.xuimanager.ui.common.message
 import dev.autorasqr.xuimanager.ui.theme.LocalStatusColors
 
@@ -66,10 +68,6 @@ import dev.autorasqr.xuimanager.ui.theme.LocalStatusColors
 fun ServerDetailScreen(
     onEdit: (Long) -> Unit,
     onDeploy: (Long) -> Unit,
-    onClients: (Long) -> Unit,
-    onInbounds: (Long) -> Unit,
-    onRouting: (Long) -> Unit,
-    onNodes: (Long) -> Unit,
     onOpenPanel: (Long) -> Unit,
     onRestore: (Long) -> Unit,
     onBack: (() -> Unit)? = null,
@@ -87,15 +85,20 @@ fun ServerDetailScreen(
     val systemUpdate by viewModel.systemUpdate.collectAsStateWithLifecycle()
     val confirmSystemUpdate by viewModel.confirmSystemUpdate.collectAsStateWithLifecycle()
     val installedPanel by viewModel.installedPanel.collectAsStateWithLifecycle()
+    val reboot by viewModel.reboot.collectAsStateWithLifecycle()
+    val confirmReboot by viewModel.confirmReboot.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         viewModel.refreshDeployState()
         viewModel.startStatusUpdates()
     }
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { viewModel.stopStatusUpdates() }
 
+    val appBarScroll = appBarScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(appBarScroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            AppTopBar(
+                scrollBehavior = appBarScroll,
                 title = { Text(server?.name.orEmpty()) },
                 navigationIcon = {
                     if (onBack != null) {
@@ -174,24 +177,36 @@ fun ServerDetailScreen(
                     onDismiss = viewModel::dismissSystemUpdate,
                 )
             }
+            reboot?.let { job ->
+                JobLog(
+                    title = stringResource(
+                        when (job.state) {
+                            DeployState.RUNNING -> R.string.reboot_running
+                            DeployState.SUCCEEDED -> R.string.reboot_done
+                            DeployState.FAILED -> R.string.reboot_failed
+                        },
+                    ),
+                    state = job.state,
+                    log = job.log,
+                    error = job.error,
+                    onDismiss = viewModel::dismissReboot,
+                )
+            }
             PanelCard(
                 server = current,
                 deployRunning = deployRunning,
                 installedPanel = installedPanel,
                 onDeploy = { onDeploy(current.id) },
                 onRestore = { onRestore(current.id) },
-                onClients = { onClients(current.id) },
-                onInbounds = { onInbounds(current.id) },
-                onRouting = { onRouting(current.id) },
-                onNodes = { onNodes(current.id) },
                 onOpenPanel = { onOpenPanel(current.id) },
             )
             panelLogin?.let { PanelLoginCard(it) }
             if (current.panel != null) {
-                StatusCard(status, onRestart = viewModel::requestRestart)
+                StatusCard(status, onRestart = viewModel::requestRestart, onRestartPanel = viewModel::requestPanelRestart)
             }
+            val rebooting = reboot?.state == DeployState.RUNNING
             val busy = deployRunning || panelUpdate?.state == DeployState.RUNNING ||
-                xrayUpdate?.state == DeployState.RUNNING || systemUpdate?.state == DeployState.RUNNING
+                xrayUpdate?.state == DeployState.RUNNING || systemUpdate?.state == DeployState.RUNNING || rebooting
             UpdatesCard(
                 server = current,
                 xrayVersion = status.status?.xrayVersion,
@@ -204,8 +219,10 @@ fun ServerDetailScreen(
             )
             SshCard(
                 server = current,
-                updateEnabled = !deployRunning && systemUpdate?.state != DeployState.RUNNING,
+                updateEnabled = !deployRunning && systemUpdate?.state != DeployState.RUNNING && !rebooting,
+                rebootEnabled = !busy,
                 onSystemUpdate = viewModel::requestSystemUpdate,
+                onReboot = viewModel::requestReboot,
             )
         }
     }
@@ -265,6 +282,28 @@ fun ServerDetailScreen(
         )
     }
 
+    if (confirmReboot) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissRebootConfirm,
+            title = { Text(stringResource(R.string.reboot_confirm_title)) },
+            text = { Text(stringResource(R.string.reboot_confirm_text, server?.name.orEmpty())) },
+            confirmButton = {
+                TextButton(onClick = viewModel::startReboot) { Text(stringResource(R.string.reboot_confirm), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = viewModel::dismissRebootConfirm) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
+    if (status.confirmPanelRestart) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissPanelRestart,
+            title = { Text(stringResource(R.string.panel_restart_title)) },
+            text = { Text(stringResource(R.string.panel_restart_text)) },
+            confirmButton = { TextButton(onClick = viewModel::restartPanel) { Text(stringResource(R.string.panel_restart_confirm)) } },
+            dismissButton = { TextButton(onClick = viewModel::dismissPanelRestart) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
     if (status.confirmRestart) {
         AlertDialog(
             onDismissRequest = viewModel::dismissRestart,
@@ -277,13 +316,13 @@ fun ServerDetailScreen(
 }
 
 @Composable
-private fun StatusCard(state: StatusUiState, onRestart: () -> Unit) {
+private fun StatusCard(state: StatusUiState, onRestart: () -> Unit, onRestartPanel: () -> Unit) {
     val context = LocalContext.current
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.status_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                if (state.loading || state.restarting) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                if (state.loading || state.restarting || state.panelRestarting) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
             }
             state.error?.let { Text(it.message(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
             val status = state.status
@@ -320,8 +359,17 @@ private fun StatusCard(state: StatusUiState, onRestart: () -> Unit) {
             if (state.restarted) {
                 Text(stringResource(R.string.status_xray_restarted), color = LocalStatusColors.current.success, style = MaterialTheme.typography.bodyMedium)
             }
-            OutlinedButton(onClick = onRestart, enabled = !state.restarting, modifier = Modifier.fillMaxWidth()) {
+            if (state.panelRestarted) {
+                Text(stringResource(R.string.panel_restarted), color = LocalStatusColors.current.success, style = MaterialTheme.typography.bodyMedium)
+            }
+            if (state.panelRestarting) {
+                Text(stringResource(R.string.panel_restarting), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            }
+            OutlinedButton(onClick = onRestart, enabled = !state.restarting && !state.panelRestarting, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.status_restart_xray))
+            }
+            OutlinedButton(onClick = onRestartPanel, enabled = !state.restarting && !state.panelRestarting, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.action_restart_panel))
             }
         }
     }
@@ -429,7 +477,7 @@ private fun <T> UpdateRow(label: String, current: String, check: UpdateCheck<T>?
 }
 
 @Composable
-private fun SshCard(server: Server, updateEnabled: Boolean, onSystemUpdate: () -> Unit) {
+private fun SshCard(server: Server, updateEnabled: Boolean, rebootEnabled: Boolean, onSystemUpdate: () -> Unit, onReboot: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.server_ssh), style = MaterialTheme.typography.titleMedium)
@@ -451,6 +499,9 @@ private fun SshCard(server: Server, updateEnabled: Boolean, onSystemUpdate: () -
             OutlinedButton(onClick = onSystemUpdate, enabled = updateEnabled, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.action_system_update))
             }
+            OutlinedButton(onClick = onReboot, enabled = rebootEnabled, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.action_reboot_server), color = if (rebootEnabled) MaterialTheme.colorScheme.error else Color.Unspecified)
+            }
         }
     }
 }
@@ -462,10 +513,6 @@ private fun PanelCard(
     installedPanel: InstalledPanel?,
     onDeploy: () -> Unit,
     onRestore: () -> Unit,
-    onClients: () -> Unit,
-    onInbounds: () -> Unit,
-    onRouting: () -> Unit,
-    onNodes: () -> Unit,
     onOpenPanel: () -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
@@ -490,20 +537,13 @@ private fun PanelCard(
                 InfoRow(stringResource(R.string.panel_port), panel.port.toString())
                 InfoRow(stringResource(R.string.panel_subscription), "${panel.subScheme.uppercase()} :${panel.subPort}")
                 InfoRow(stringResource(R.string.panel_deployed_at), Formatters.dateTime(panel.deployedAt))
+                // Clients, inbounds and the rest are tabs of the server screen; a node's live on the main panel.
                 if (server.isNode) {
-                    // Clients, inbounds and subscriptions of a node live on the main panel.
                     Text(
                         stringResource(if (server.nodeId != null) R.string.node_server_managed else R.string.node_server_unregistered),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                } else {
-                    Button(onClick = onClients, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.action_clients)) }
-                    Button(onClick = onInbounds, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.action_inbounds)) }
-                    Button(onClick = onRouting, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.action_routing)) }
-                    if ((PanelVersion.major(panel.version) ?: 0) >= 3) {
-                        Button(onClick = onNodes, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.action_nodes)) }
-                    }
                 }
                 OutlinedButton(onClick = onOpenPanel, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.action_open_panel)) }
                 OutlinedButton(onClick = onDeploy, enabled = !deployRunning, modifier = Modifier.fillMaxWidth()) {

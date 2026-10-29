@@ -12,7 +12,9 @@ import dev.autorasqr.xuimanager.domain.model.Node
 import dev.autorasqr.xuimanager.domain.model.NodeTestResult
 import dev.autorasqr.xuimanager.domain.model.NodesSnapshot
 import dev.autorasqr.xuimanager.domain.model.PendingNode
+import dev.autorasqr.xuimanager.domain.model.RebootProgress
 import dev.autorasqr.xuimanager.domain.repository.NodeRepository
+import dev.autorasqr.xuimanager.domain.repository.ServerPowerRepository
 import dev.autorasqr.xuimanager.domain.repository.ServerRepository
 import dev.autorasqr.xuimanager.ui.common.asAppError
 import dev.autorasqr.xuimanager.ui.navigation.NodesRoute
@@ -29,6 +31,9 @@ import javax.inject.Inject
 
 data class NodesMessage(@param:StringRes val text: Int? = null, val error: AppError? = null, val probe: Pair<String, NodeTestResult>? = null)
 
+/** What can be done to a node's own server; only for nodes the app reaches over SSH. */
+enum class PowerAction { RESTART_PANEL, REBOOT }
+
 data class NodesUiState(
     val snapshot: NodesSnapshot? = null,
     val refreshing: Boolean = false,
@@ -38,6 +43,8 @@ data class NodesUiState(
     val confirmDelete: Node? = null,
     val confirmForget: PendingNode? = null,
     val addChooser: Boolean = false,
+    /** Restart or reboot waiting for confirmation. */
+    val confirmPower: Pair<Node, PowerAction>? = null,
     val message: NodesMessage? = null,
 )
 
@@ -46,6 +53,7 @@ class NodesViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: NodeRepository,
     private val servers: ServerRepository,
+    private val power: ServerPowerRepository,
 ) : ViewModel() {
     val serverId: Long = savedStateHandle.toRoute<NodesRoute>().serverId
 
@@ -106,6 +114,29 @@ class NodesViewModel @Inject constructor(
         repository.register(serverId, pending.serverId)
         _state.update { it.copy(message = NodesMessage(text = R.string.node_registered)) }
         load()
+    }
+
+    fun rebootProgress(nodeServerId: Long): StateFlow<RebootProgress?> = power.rebootProgress(nodeServerId)
+    fun dismissReboot(nodeServerId: Long) = power.clearRebootProgress(nodeServerId)
+
+    fun requestPower(node: Node, action: PowerAction) {
+        if (node.serverId != null) _state.update { it.copy(confirmPower = node to action) }
+    }
+
+    fun dismissPower() = _state.update { it.copy(confirmPower = null) }
+
+    fun confirmPower() {
+        val (node, action) = _state.value.confirmPower ?: return
+        _state.update { it.copy(confirmPower = null) }
+        val nodeServerId = node.serverId ?: return
+        when (action) {
+            PowerAction.REBOOT -> power.reboot(nodeServerId)
+            PowerAction.RESTART_PANEL -> act(node.key) {
+                power.restartPanel(nodeServerId)
+                _state.update { it.copy(message = NodesMessage(text = R.string.panel_restarted)) }
+                load()
+            }
+        }
     }
 
     fun requestForget(pending: PendingNode) = _state.update { it.copy(confirmForget = pending) }

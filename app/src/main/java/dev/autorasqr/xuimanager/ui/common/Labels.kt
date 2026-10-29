@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalContext
 import dev.autorasqr.xuimanager.R
 import dev.autorasqr.xuimanager.domain.model.AppError
 import dev.autorasqr.xuimanager.domain.model.CertificateIssue
+import dev.autorasqr.xuimanager.domain.model.InboundSaveStep
 import dev.autorasqr.xuimanager.domain.model.DeployStage
 import dev.autorasqr.xuimanager.domain.model.InboundProtocol
 import dev.autorasqr.xuimanager.domain.model.InboundSecurity
@@ -135,6 +136,15 @@ fun AppError.message(context: Context): String = when (this) {
     is AppError.PanelUpdateFailed -> context.getString(R.string.error_panel_update, detail ?: "—")
     is AppError.XrayUpdateFailed -> context.getString(R.string.error_xray_update, detail ?: "—")
     is AppError.ReleaseCheckFailed -> context.getString(R.string.error_release_check, detail ?: "—")
+    is AppError.InboundSavedWithWarning -> context.getString(
+        when (step) {
+            InboundSaveStep.UPDATE -> R.string.error_inbound_saved_update
+            InboundSaveStep.FALLBACKS -> R.string.error_inbound_saved_fallbacks
+            InboundSaveStep.XRAY_RESTART -> R.string.error_inbound_saved_xray
+        },
+        cause.message(context),
+    )
+    is AppError.RebootFailed -> context.getString(if (detail == "timeout") R.string.error_reboot_timeout else R.string.error_reboot)
     AppError.PanelUnauthorized -> context.getString(R.string.error_panel_unauthorized)
     AppError.PanelNotFound -> context.getString(R.string.error_panel_not_found)
     AppError.PanelNotDeployed -> context.getString(R.string.error_panel_not_deployed)

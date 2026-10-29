@@ -55,6 +55,9 @@ data class SelfStealForm(
     val sitePage: SitePageChoice = SitePageChoice(),
 )
 
+/** The server hosting a decoy site: this one, or a node's own server. */
+data class SitePageTarget(val serverId: Long, val domain: String)
+
 data class InboundsUiState(
     val snapshot: InboundsSnapshot? = null,
     val loading: Boolean = true,
@@ -64,8 +67,9 @@ data class InboundsUiState(
     val addMenu: Boolean = false,
     val realityForm: RealityForm? = null,
     val selfStealForm: SelfStealForm? = null,
-    /** "Change page" dialog for the installed decoy site. */
+    /** "Change page" dialog for an installed decoy site, and whose site it is. */
     val sitePageForm: SitePageChoice? = null,
+    val sitePageTarget: SitePageTarget? = null,
     val confirmDelete: InboundItem? = null,
     /** After the last self-steal inbound is deleted: offer to remove the decoy site too. */
     val offerRemoveSite: Boolean = false,
@@ -124,8 +128,10 @@ class InboundsViewModel @Inject constructor(
         perform(item.id, R.string.inbound_deleted) {
             repository.delete(serverId, item.id)
             val snapshot = _state.value.snapshot
-            val othersUseSite = snapshot?.items.orEmpty().any { it.selfSteal && it.id != item.id }
-            if (item.selfSteal && snapshot?.selfStealPort != null && !othersUseSite) {
+            // Only this server's own site is offered for removal; a node's site stays with the node.
+            val ownSite = { it: InboundItem -> it.selfSteal && it.siteServerId == serverId }
+            val othersUseSite = snapshot?.items.orEmpty().any { ownSite(it) && it.id != item.id }
+            if (ownSite(item) && snapshot?.selfStealPort != null && !othersUseSite) {
                 _state.update { it.copy(offerRemoveSite = true) }
             }
         }
@@ -222,8 +228,17 @@ class InboundsViewModel @Inject constructor(
 
     // --- decoy page of an installed site ---
 
-    fun openSitePage() = _state.update { it.copy(sitePageForm = SitePageChoice()) }
-    fun closeSitePage() = _state.update { it.copy(sitePageForm = null) }
+    /** The decoy site of [item]'s server, or this server's own site without one. */
+    fun openSitePage(item: InboundItem? = null) {
+        val target = if (item?.siteServerId != null && item.siteDomain != null) {
+            SitePageTarget(item.siteServerId, item.siteDomain)
+        } else {
+            _state.value.snapshot?.domain?.let { SitePageTarget(serverId, it) } ?: return
+        }
+        _state.update { it.copy(sitePageForm = SitePageChoice(), sitePageTarget = target) }
+    }
+
+    fun closeSitePage() = _state.update { it.copy(sitePageForm = null, sitePageTarget = null) }
 
     fun onSitePage(resolver: ContentResolver, uri: Uri) {
         viewModelScope.launch {
@@ -237,9 +252,10 @@ class InboundsViewModel @Inject constructor(
     /** Uploads the chosen page; with none chosen the site gets a fresh random template. */
     fun applySitePage() {
         val page = _state.value.sitePageForm ?: return
+        val target = _state.value.sitePageTarget ?: return
         if (page.invalid) return
-        _state.update { it.copy(sitePageForm = null) }
-        repository.updateSitePage(serverId, page.bytes)
+        _state.update { it.copy(sitePageForm = null, sitePageTarget = null) }
+        repository.updateSitePage(serverId, page.bytes, target.serverId)
     }
 
     fun dismissSelfStealProgress() = repository.clearSelfStealProgress(serverId)

@@ -62,3 +62,10 @@ data class RestoreProgress(
     val log: List<String>,
     val error: AppError?,
 )
+
+/** Restarting the whole server on request, then waiting until it answers over SSH again. */
+data class RebootProgress(
+    val state: DeployState,
+    val log: List<String>,
+    val error: AppError?,
+)

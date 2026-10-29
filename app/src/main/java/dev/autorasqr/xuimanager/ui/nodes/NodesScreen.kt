@@ -36,7 +36,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -55,17 +55,22 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.autorasqr.xuimanager.R
+import dev.autorasqr.xuimanager.domain.model.DeployState
 import dev.autorasqr.xuimanager.domain.model.Node
 import dev.autorasqr.xuimanager.domain.model.NodeStatus
 import dev.autorasqr.xuimanager.domain.model.PendingNode
+import dev.autorasqr.xuimanager.domain.model.RebootProgress
+import dev.autorasqr.xuimanager.ui.common.AppTopBar
 import dev.autorasqr.xuimanager.ui.common.Formatters
+import dev.autorasqr.xuimanager.ui.common.appBarScrollBehavior
 import dev.autorasqr.xuimanager.ui.common.message
 import dev.autorasqr.xuimanager.ui.theme.LocalStatusColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NodesScreen(
-    onBack: () -> Unit,
+    /** Null when the screen is a tab of the server screen. */
+    onBack: (() -> Unit)?,
     onAddServer: (masterId: Long) -> Unit,
     onAddPanel: (masterId: Long) -> Unit,
     onEdit: (masterId: Long, nodeId: Int) -> Unit,
@@ -98,13 +103,18 @@ fun NodesScreen(
         if (text != null) snackbar.showSnackbar(text)
     }
 
+    val appBarScroll = appBarScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(appBarScroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            AppTopBar(
+                scrollBehavior = appBarScroll,
                 title = { Text(stringResource(R.string.nodes_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                        }
                     }
                 },
                 actions = {
@@ -178,6 +188,9 @@ fun NodesScreen(
                         onServer = node.serverId?.let { id -> { onServer(id) } },
                         onConnectSsh = { onConnectSsh(viewModel.serverId, node) },
                         onDelete = { viewModel.requestDelete(node) },
+                        onPower = { action -> viewModel.requestPower(node, action) },
+                        reboot = node.serverId?.let { id -> viewModel.rebootProgress(id).collectAsStateWithLifecycle().value },
+                        onDismissReboot = { node.serverId?.let(viewModel::dismissReboot) },
                     )
                 }
             }
@@ -223,6 +236,26 @@ fun NodesScreen(
         )
     }
 
+    state.confirmPower?.let { (node, action) ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissPower,
+            title = { Text(stringResource(if (action == PowerAction.REBOOT) R.string.reboot_confirm_title else R.string.panel_restart_title)) },
+            text = {
+                Text(
+                    if (action == PowerAction.REBOOT) stringResource(R.string.reboot_confirm_text, node.name)
+                    else stringResource(R.string.panel_restart_text),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmPower) {
+                    if (action == PowerAction.REBOOT) Text(stringResource(R.string.reboot_confirm), color = MaterialTheme.colorScheme.error)
+                    else Text(stringResource(R.string.panel_restart_confirm))
+                }
+            },
+            dismissButton = { TextButton(onClick = viewModel::dismissPower) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
     state.confirmForget?.let { pending ->
         AlertDialog(
             onDismissRequest = viewModel::dismissForget,
@@ -246,8 +279,13 @@ private fun NodeCard(
     onServer: (() -> Unit)?,
     onConnectSsh: () -> Unit,
     onDelete: () -> Unit,
+    onPower: (PowerAction) -> Unit,
+    /** Reboot of the node's own server; null for nodes without one or when none ran. */
+    reboot: RebootProgress?,
+    onDismissReboot: () -> Unit,
 ) {
     val context = LocalContext.current
+    val rebooting = reboot?.state == DeployState.RUNNING
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -302,6 +340,34 @@ private fun NodeCard(
                 // A node the app has no SSH access to (added by hand, or deployed from another phone).
                 if (onServer == null) {
                     TextButton(onClick = onConnectSsh, enabled = !busy) { Text(stringResource(R.string.node_connect_ssh)) }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { onPower(PowerAction.RESTART_PANEL) }, enabled = !busy && !rebooting) {
+                            Text(stringResource(R.string.action_restart_panel))
+                        }
+                        OutlinedButton(onClick = { onPower(PowerAction.REBOOT) }, enabled = !busy && !rebooting) {
+                            Text(stringResource(R.string.action_reboot_short))
+                        }
+                    }
+                }
+            }
+            reboot?.let { job ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        when (job.state) {
+                            DeployState.RUNNING -> stringResource(R.string.reboot_running)
+                            DeployState.SUCCEEDED -> stringResource(R.string.reboot_done)
+                            DeployState.FAILED -> job.error?.message() ?: stringResource(R.string.reboot_failed)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = when (job.state) {
+                            DeployState.RUNNING -> MaterialTheme.colorScheme.onSurfaceVariant
+                            DeployState.SUCCEEDED -> LocalStatusColors.current.success
+                            DeployState.FAILED -> MaterialTheme.colorScheme.error
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (job.state != DeployState.RUNNING) TextButton(onClick = onDismissReboot) { Text(stringResource(R.string.close)) }
                 }
             }
         }
