@@ -10,6 +10,8 @@ import dev.autorasqr.xuimanager.data.deploy.RemoteJob
 import dev.autorasqr.xuimanager.data.deploy.ServerScripts
 import dev.autorasqr.xuimanager.data.error.ioMapped
 import dev.autorasqr.xuimanager.data.error.toAppError
+import dev.autorasqr.xuimanager.data.geo.CountryLookup
+import dev.autorasqr.xuimanager.data.geo.Flags
 import dev.autorasqr.xuimanager.data.inbound.InboundFactory
 import dev.autorasqr.xuimanager.data.inbound.InboundRequest
 import dev.autorasqr.xuimanager.data.inbound.SelfStealTarget
@@ -36,6 +38,9 @@ import dev.autorasqr.xuimanager.domain.model.SniCheck
 import dev.autorasqr.xuimanager.domain.model.ValidationField
 import dev.autorasqr.xuimanager.domain.repository.InboundRepository
 import dev.autorasqr.xuimanager.domain.usecase.HostValidator
+import java.util.concurrent.ConcurrentHashMap
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,9 +49,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.concurrent.ConcurrentHashMap
-import javax.inject.Inject
-import javax.inject.Singleton
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 @Singleton
 class InboundRepositoryImpl @Inject constructor(
@@ -55,6 +59,7 @@ class InboundRepositoryImpl @Inject constructor(
     private val factory: InboundFactory,
     private val random: RandomTokens,
     private val scripts: ServerScripts,
+    private val countries: CountryLookup,
 ) : InboundRepository {
 
     /** Self-steal keeps running when the screen is left; the remote part survives the app as well. */
@@ -63,7 +68,7 @@ class InboundRepositoryImpl @Inject constructor(
 
     override suspend fun load(serverId: Long): InboundsSnapshot = ioMapped {
         val (server, api) = panels.forServer(serverId)
-        val inbounds = api.listInbounds()
+        val inbounds = addFlags(api, server, api.listInbounds())
         // Node names are a nicety: an unreachable node list must not hide the inbounds.
         val nodes = if (api.capabilities.nodes) runCatching { nodeChoices(serverId, api) }.getOrDefault(emptyList()) else emptyList()
         val names = nodes.associate { it.id to it.name }
@@ -78,6 +83,33 @@ class InboundRepositoryImpl @Inject constructor(
             selfStealPort = server.panel?.selfstealPort,
             nodes = nodes,
         )
+    }
+
+    /**
+     * Puts the country flag in front of every inbound name that has none (the node's country for an inbound on a
+     * node). Best effort: an inbound that can't be renamed keeps its name. No Xray restart: the name is not in its config.
+     */
+    private suspend fun addFlags(api: PanelApi, server: Server, inbounds: List<PanelInbound>): List<PanelInbound> {
+        if (inbounds.all { Flags.startsWithFlag(it.remark) }) return inbounds
+        val addresses: Map<Int, String> = if (inbounds.any { it.nodeId != null && !Flags.startsWithFlag(it.remark) }) {
+            runCatching { api.listNodes().associate { it.id to it.address } }.getOrDefault(emptyMap())
+        } else {
+            emptyMap()
+        }
+        val renamed = flagRenames(inbounds, { addresses[it] }, server.host).associate { (inbound, host) ->
+            val remark = Flags.prefix(inbound.remark, countries.flag(host))
+            val ok = try {
+                val current = api.getInbound(inbound.id)
+                api.updateInbound(inbound.id, JsonObject(current + ("remark" to JsonPrimitive(remark))))
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                false
+            }
+            inbound.id to remark.takeIf { ok }
+        }
+        return inbounds.map { ib -> renamed[ib.id]?.let { ib.copy(remark = it) } ?: ib }
     }
 
     override suspend fun setEnabled(serverId: Long, inboundId: Int, enabled: Boolean) = ioMapped {
@@ -132,10 +164,11 @@ class InboundRepositoryImpl @Inject constructor(
             } else {
                 val used = api.listInbounds().filter { it.nodeId == null }.map { it.port }.toSet()
                 val inboundPort = if (443 !in used) 443 else generateSequence { random.port() }.first { it !in used && it != server.sshPort }
+                val flag = countries.flag(server.host)
                 factory.create(
                     api,
                     InboundRequest(
-                        remark = DeployConfig.SELFSTEAL_REMARK,
+                        remark = Flags.prefix(DeployConfig.SELFSTEAL_REMARK, flag),
                         protocol = InboundProtocol.VLESS,
                         transport = InboundTransport.TCP,
                         port = inboundPort,
@@ -237,6 +270,15 @@ class InboundRepositoryImpl @Inject constructor(
 
     private fun fingerprint(value: String) = value.takeIf { it in Fingerprints.all } ?: Fingerprints.all.first()
 }
+
+/**
+ * Inbounds whose name has no flag yet, with the address their country is looked up by: the node's for an inbound
+ * on a node, otherwise (or when the node's address is unknown) [serverHost].
+ */
+internal fun flagRenames(inbounds: List<PanelInbound>, nodeAddress: (Int) -> String?, serverHost: String): List<Pair<PanelInbound, String>> =
+    inbounds.filter { !Flags.startsWithFlag(it.remark) }.map { ib ->
+        ib to (ib.nodeId?.let(nodeAddress)?.takeIf { it.isNotBlank() } ?: serverHost)
+    }
 
 /** [nodeServer] is the node's own server in the app, when the inbound is on a node the app reaches over SSH. */
 internal fun PanelInbound.toItem(server: Server, nodeName: String?, nodeServer: Server? = null): InboundItem {

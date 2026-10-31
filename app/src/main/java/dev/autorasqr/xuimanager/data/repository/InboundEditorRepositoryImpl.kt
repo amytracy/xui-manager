@@ -3,6 +3,8 @@ package dev.autorasqr.xuimanager.data.repository
 import dev.autorasqr.xuimanager.data.deploy.SniPresets
 import dev.autorasqr.xuimanager.data.error.ioMapped
 import dev.autorasqr.xuimanager.data.error.toAppError
+import dev.autorasqr.xuimanager.data.geo.CountryLookup
+import dev.autorasqr.xuimanager.data.geo.Flags
 import dev.autorasqr.xuimanager.data.inbound.hostName
 import dev.autorasqr.xuimanager.data.panel.PanelApi
 import dev.autorasqr.xuimanager.data.panel.PanelApiProvider
@@ -22,6 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class InboundEditorRepositoryImpl @Inject constructor(
     private val panels: PanelApiProvider,
+    private val countries: CountryLookup,
 ) : InboundEditorRepository {
 
     private suspend fun api(serverId: Long) = panels.forServer(serverId).second
@@ -48,7 +51,21 @@ class InboundEditorRepositoryImpl @Inject constructor(
     }
 
     override suspend fun save(serverId: Long, inboundId: Int?, payload: JsonObject, fallbacks: List<JsonObject>?): Int =
-        ioMapped { api(serverId).saveInbound(inboundId, payload, fallbacks) }
+        ioMapped {
+            val (server, api) = panels.forServer(serverId)
+            val body = if (inboundId == null) withFlag(api, server.host, payload) else payload
+            api.saveInbound(inboundId, body, fallbacks)
+        }
+
+    /** A new inbound's name starts with the flag of the country it runs in: the node's, when placed on one. */
+    private suspend fun withFlag(api: PanelApi, serverHost: String, payload: JsonObject): JsonObject {
+        val remark = payload.string("remark").orEmpty()
+        if (Flags.startsWithFlag(remark)) return payload
+        val nodeId = payload.int("nodeId")?.takeIf { it > 0 }
+        val host = if (nodeId == null) serverHost
+        else runCatching { api.listNodes().firstOrNull { it.id == nodeId }?.address }.getOrNull()?.takeIf { it.isNotBlank() } ?: serverHost
+        return JsonObject(payload + ("remark" to JsonPrimitive(Flags.prefix(remark, countries.flag(host)))))
+    }
 
     override suspend fun newX25519(serverId: Long): Pair<String, String> = ioMapped {
         val keys = api(serverId).newX25519()

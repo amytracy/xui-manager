@@ -1,7 +1,6 @@
 package dev.autorasqr.xuimanager.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -44,8 +43,9 @@ data class ServerEditRoute(
     val name: String = "",
 )
 
+/** fromNodes: opened from a node list, so the screen has a way back; the home server has none. */
 @Serializable
-data class ServerDetailRoute(val serverId: Long)
+data class ServerDetailRoute(val serverId: Long, val fromNodes: Boolean = false)
 
 @Serializable
 data class DeployRoute(val serverId: Long)
@@ -133,9 +133,9 @@ fun AppNavHost() {
                 onDone = { wasNode -> nav.afterServerDeleted(wasNode) },
             )
         }
-        composable<ServerDetailRoute> {
-            // The home server is the root; a node's server screen is opened from the node list.
-            val canGoBack = remember { nav.previousBackStackEntry != null }
+        composable<ServerDetailRoute> { entry ->
+            // The home server is the root (no way back); a node's server screen is opened from the node list.
+            val canGoBack = entry.toRoute<ServerDetailRoute>().fromNodes
             // Tabs of the server screen; everything they open goes full screen over them, on the app's own stack.
             ServerHomeScreen(
                 tabs = {
@@ -221,7 +221,7 @@ private fun NodesDestination(nav: NavHostController, onBack: (() -> Unit)?) {
         onAddServer = { masterId -> nav.navigate(ServerEditRoute(masterServerId = masterId)) },
         onAddPanel = { masterId -> nav.navigate(NodeEditRoute(masterId)) },
         onEdit = { masterId, nodeId -> nav.navigate(NodeEditRoute(masterId, nodeId)) },
-        onServer = { id -> nav.navigate(ServerDetailRoute(id)) },
+        onServer = { id -> nav.navigate(ServerDetailRoute(id, fromNodes = true)) },
         onDeploy = { id -> nav.navigate(DeployRoute(id)) },
         onConnectSsh = { masterId, node ->
             nav.navigate(ServerEditRoute(masterServerId = masterId, restoreNodeId = node.id, host = node.address, name = node.name))

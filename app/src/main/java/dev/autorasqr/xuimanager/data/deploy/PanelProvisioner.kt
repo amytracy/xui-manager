@@ -1,6 +1,8 @@
 package dev.autorasqr.xuimanager.data.deploy
 
 import dev.autorasqr.xuimanager.data.error.toAppError
+import dev.autorasqr.xuimanager.data.geo.CountryLookup
+import dev.autorasqr.xuimanager.data.geo.Flags
 import dev.autorasqr.xuimanager.data.inbound.InboundFactory
 import dev.autorasqr.xuimanager.data.inbound.InboundRequest
 import dev.autorasqr.xuimanager.data.inbound.SelfStealTarget
@@ -36,6 +38,7 @@ class PanelProvisioner @Inject constructor(
     private val apiFactory: PanelApiFactory,
     private val random: RandomTokens,
     private val factory: InboundFactory,
+    private val countries: CountryLookup,
 ) {
     suspend fun provision(
         host: String,
@@ -83,8 +86,12 @@ class PanelProvisioner @Inject constructor(
         val subscription = api.subscriptionSettings()
         if (!subscription.tls) warnings += DeployWarning.SUBSCRIPTION_PLAIN_HTTP
 
-        val request = inboundRequest(params, result, host)
-        val existing = api.listInbounds().firstOrNull { it.remark == request.remark }
+        val code = countries.countryCode(host)
+        val flag = Flags.emoji(code)
+        log(if (code != null) "Server country: $code $flag" else "Country not detected, using $flag")
+        val request = inboundRequest(params, result, host).let { it.copy(remark = Flags.prefix(it.remark, flag)) }
+        val baseRemark = Flags.strip(request.remark)
+        val existing = api.listInbounds().firstOrNull { Flags.strip(it.remark) == baseRemark }
         val inboundId = if (existing != null) {
             log("Reusing inbound #${existing.id} on port ${existing.port}")
             existing.id
@@ -221,8 +228,8 @@ class PanelProvisioner @Inject constructor(
         /** The inbound new clients go to: one the app created, otherwise the first that can have clients. */
         fun defaultInbound(inbounds: List<PanelInbound>): PanelInbound? {
             val own = inbounds.filter { it.nodeId == null }
-            return own.firstOrNull { it.remark == DeployConfig.SELFSTEAL_REMARK }
-                ?: own.firstOrNull { it.remark == DeployConfig.INBOUND_REMARK }
+            return own.firstOrNull { Flags.strip(it.remark) == DeployConfig.SELFSTEAL_REMARK }
+                ?: own.firstOrNull { Flags.strip(it.remark) == DeployConfig.INBOUND_REMARK }
                 ?: own.firstOrNull { it.protocol in CLIENT_PROTOCOLS }
                 ?: inbounds.firstOrNull { it.protocol in CLIENT_PROTOCOLS }
         }
