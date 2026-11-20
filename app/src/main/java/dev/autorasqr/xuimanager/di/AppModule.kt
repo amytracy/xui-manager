@@ -9,7 +9,10 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.autorasqr.xuimanager.data.db.AppDatabase
+import dev.autorasqr.xuimanager.data.db.MIGRATION_6_7
+import dev.autorasqr.xuimanager.data.db.DbTransactions
 import dev.autorasqr.xuimanager.data.db.DeployJobDao
+import dev.autorasqr.xuimanager.data.db.RoomDbTransactions
 import dev.autorasqr.xuimanager.data.db.ServerDao
 import dev.autorasqr.xuimanager.data.deploy.DeployLauncher
 import dev.autorasqr.xuimanager.data.geo.CountryLookup
@@ -29,6 +32,9 @@ import dev.autorasqr.xuimanager.data.repository.ServerPowerRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.ServerRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.SubscriptionRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.SystemUpdateRepositoryImpl
+import dev.autorasqr.xuimanager.data.repository.AppearanceUiStyleSource
+import dev.autorasqr.xuimanager.data.repository.TransferRepositoryImpl
+import dev.autorasqr.xuimanager.data.repository.UiStyleSource
 import dev.autorasqr.xuimanager.data.repository.UninstallRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.XrayUpdateRepositoryImpl
 import dev.autorasqr.xuimanager.data.secure.KeystoreSecretStore
@@ -48,6 +54,7 @@ import dev.autorasqr.xuimanager.domain.repository.ServerPowerRepository
 import dev.autorasqr.xuimanager.domain.repository.ServerRepository
 import dev.autorasqr.xuimanager.domain.repository.SubscriptionRepository
 import dev.autorasqr.xuimanager.domain.repository.SystemUpdateRepository
+import dev.autorasqr.xuimanager.domain.repository.TransferRepository
 import dev.autorasqr.xuimanager.domain.repository.UninstallRepository
 import dev.autorasqr.xuimanager.domain.repository.XrayUpdateRepository
 import dev.autorasqr.xuimanager.service.ServiceDeployLauncher
@@ -60,7 +67,7 @@ object AppModule {
     @Provides
     @Singleton
     fun database(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, "xui-manager.db").build()
+        Room.databaseBuilder(context, AppDatabase::class.java, "xui-manager.db").addMigrations(MIGRATION_6_7).build()
 
     @Provides
     fun serverDao(db: AppDatabase): ServerDao = db.serverDao()
@@ -101,4 +108,7 @@ abstract class BindingsModule {
     @Binds abstract fun appUpdateRepository(impl: AppUpdateRepositoryImpl): AppUpdateRepository
     @Binds abstract fun deployLauncher(impl: ServiceDeployLauncher): DeployLauncher
     @Binds abstract fun countryLookup(impl: HttpCountryLookup): CountryLookup
+    @Binds abstract fun transferRepository(impl: TransferRepositoryImpl): TransferRepository
+    @Binds abstract fun dbTransactions(impl: RoomDbTransactions): DbTransactions
+    @Binds abstract fun uiStyleSource(impl: AppearanceUiStyleSource): UiStyleSource
 }

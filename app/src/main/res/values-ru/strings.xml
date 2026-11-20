@@ -553,4 +553,46 @@
     <string name="appearance_style">Стиль</string>
     <string name="style_material_you_text">Цвета из обоев, компактные заголовки</string>
     <string name="style_one_ui_text">Крупные заголовки, которые сворачиваются при прокрутке, более круглые блоки, синий акцент</string>
+
+    <!-- Перенос на другой телефон -->
+    <string name="more_transfer_export">Перенос на другой телефон</string>
+    <string name="more_transfer_export_text">QR-коды или ссылка с полным доступом к серверам</string>
+    <string name="more_transfer_import">Получить с другого телефона</string>
+    <string name="more_transfer_import_text">Добавить серверы с другого телефона с этим приложением</string>
+    <string name="onboarding_transfer">Перенести с другого телефона</string>
+    <string name="transfer_export_title">Перенос на другой телефон</string>
+    <string name="transfer_export_intro">На другой телефон перейдут все серверы приложения: основной и его ноды, SSH-доступы и ключи, логины панели и API-токены. Этот телефон тоже продолжит работать.</string>
+    <string name="transfer_export_warning">Тот, кто отсканирует эти QR-коды или получит ссылку вместе с кодом, получит полный root-доступ к серверам. Показывайте их только себе.</string>
+    <string name="transfer_export_show">Показать QR-коды и ссылку</string>
+    <string name="transfer_export_failed">Не удалось подготовить перенос: в приложении нет серверов.</string>
+    <string name="transfer_export_servers">Серверов для переноса: %1$d</string>
+    <string name="transfer_tab_qr">QR-коды</string>
+    <string name="transfer_tab_link">Ссылка</string>
+    <string name="transfer_tab_scan">Сканировать</string>
+    <string name="transfer_qr_hint">На новом телефоне откройте xui rasqr → «Перенести с другого телефона» и наведите камеру сюда. Коды меняются сами — держите камеру, пока не считаются все.</string>
+    <string name="transfer_qr_counter">%1$d из %2$d</string>
+    <string name="transfer_qr_prev">Предыдущий код</string>
+    <string name="transfer_qr_next">Следующий код</string>
+    <string name="transfer_qr_pause">Пауза</string>
+    <string name="transfer_qr_play">Листать</string>
+    <string name="transfer_link_hint">Отправьте ссылку на новый телефон, например себе в мессенджер. На новом телефоне вставьте её в «Перенести с другого телефона» → «Ссылка» или просто нажмите на неё.</string>
+    <string name="transfer_code_label">Код для ссылки</string>
+    <string name="transfer_code_hint">Передайте код другим способом (продиктуйте, наберите вручную). Без кода ссылка ничего не откроет.</string>
+    <string name="transfer_import_title">Перенос с другого телефона</string>
+    <string name="transfer_scan_hint">На старом телефоне откройте «Ещё» → «Перенос на другой телефон» и наведите камеру на QR-коды.</string>
+    <string name="transfer_scan_progress">Считано кодов: %1$d из %2$d</string>
+    <string name="transfer_scan_restart">Сканировать заново</string>
+    <string name="transfer_camera_needed">Чтобы сканировать QR-коды, нужен доступ к камере.</string>
+    <string name="transfer_camera_denied">Нет доступа к камере. Разрешите его или используйте вкладку «Ссылка».</string>
+    <string name="transfer_camera_allow">Разрешить камеру</string>
+    <string name="transfer_link_import_hint">Вставьте ссылку со старого телефона и введите код, показанный под ней.</string>
+    <string name="transfer_link_field">Ссылка</string>
+    <string name="transfer_code_field">Код</string>
+    <string name="transfer_import_action">Перенести серверы</string>
+    <string name="transfer_error_not_transfer">Это не QR-код или ссылка переноса xui rasqr.</string>
+    <string name="transfer_error_wrong_code">Неверный код.</string>
+    <string name="transfer_error_damaged">Данные повреждены. Покажите QR-коды ещё раз или скопируйте ссылку заново.</string>
+    <string name="transfer_error_newer">На другом телефоне более новая версия приложения. Сначала обновите это.</string>
+    <string name="transfer_error_other">Считан QR-код другого переноса. Начните сканирование заново.</string>
+    <string name="transfer_error_save">Не удалось сохранить серверы. Попробуйте ещё раз.</string>
 </resources>

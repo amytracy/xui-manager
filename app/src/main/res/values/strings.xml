@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">XUI Manager</string>
+    <string name="app_name" translatable="false">xui rasqr</string>
 
     <!-- Common -->
     <string name="cancel">Cancel</string>
@@ -557,4 +557,46 @@
     <string name="style_material_you_text">Colours from your wallpaper, compact top bars</string>
     <string name="style_one_ui" translatable="false">One UI</string>
     <string name="style_one_ui_text">Large titles that fold away as you scroll, rounder blocks, blue accent</string>
+
+    <!-- Transfer to another phone -->
+    <string name="more_transfer_export">Move to another phone</string>
+    <string name="more_transfer_export_text">QR codes or a link with full access to your servers</string>
+    <string name="more_transfer_import">Receive from another phone</string>
+    <string name="more_transfer_import_text">Add servers from another phone with this app</string>
+    <string name="onboarding_transfer">Move from another phone</string>
+    <string name="transfer_export_title">Move to another phone</string>
+    <string name="transfer_export_intro">The other phone gets every server of the app: the main one and its nodes, SSH logins and keys, panel logins and API tokens. This phone keeps working too.</string>
+    <string name="transfer_export_warning">Whoever scans these QR codes, or has the link together with its code, gets full root access to your servers. Show them only to yourself.</string>
+    <string name="transfer_export_show">Show QR codes and link</string>
+    <string name="transfer_export_failed">Couldn\'t prepare the transfer: there are no servers in the app.</string>
+    <string name="transfer_export_servers">Servers to transfer: %1$d</string>
+    <string name="transfer_tab_qr">QR codes</string>
+    <string name="transfer_tab_link">Link</string>
+    <string name="transfer_tab_scan">Scan</string>
+    <string name="transfer_qr_hint">On the new phone open xui rasqr → \"Move from another phone\" and point the camera here. The codes change by themselves; keep the camera on them until all are read.</string>
+    <string name="transfer_qr_counter">%1$d of %2$d</string>
+    <string name="transfer_qr_prev">Previous code</string>
+    <string name="transfer_qr_next">Next code</string>
+    <string name="transfer_qr_pause">Pause</string>
+    <string name="transfer_qr_play">Play</string>
+    <string name="transfer_link_hint">Send the link to the new phone, e.g. to yourself in a messenger. On the new phone paste it in \"Move from another phone\" → \"Link\", or just tap it.</string>
+    <string name="transfer_code_label">Code for the link</string>
+    <string name="transfer_code_hint">Pass the code in another way (say it, type it by hand). Without the code the link opens nothing.</string>
+    <string name="transfer_import_title">Move from another phone</string>
+    <string name="transfer_scan_hint">On the old phone open More → \"Move to another phone\" and point the camera at its QR codes.</string>
+    <string name="transfer_scan_progress">Codes read: %1$d of %2$d</string>
+    <string name="transfer_scan_restart">Scan again</string>
+    <string name="transfer_camera_needed">Camera access is needed to scan the QR codes.</string>
+    <string name="transfer_camera_denied">No camera access. Allow it, or use the link tab.</string>
+    <string name="transfer_camera_allow">Allow camera</string>
+    <string name="transfer_link_import_hint">Paste the link from the old phone and enter the code shown under it.</string>
+    <string name="transfer_link_field">Link</string>
+    <string name="transfer_code_field">Code</string>
+    <string name="transfer_import_action">Move servers</string>
+    <string name="transfer_error_not_transfer">This is not a transfer QR code or link of xui rasqr.</string>
+    <string name="transfer_error_wrong_code">Wrong code.</string>
+    <string name="transfer_error_damaged">The data is damaged. Show the QR codes again or copy the link once more.</string>
+    <string name="transfer_error_newer">The other phone has a newer version of the app. Update this one first.</string>
+    <string name="transfer_error_other">A QR code of another transfer was read. Start the scan again.</string>
+    <string name="transfer_error_save">Couldn\'t save the servers. Try again.</string>
 </resources>

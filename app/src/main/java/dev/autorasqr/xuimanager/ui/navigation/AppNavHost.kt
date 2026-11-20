@@ -1,11 +1,14 @@
 package dev.autorasqr.xuimanager.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.toRoute
+import kotlinx.coroutines.flow.first
 import dev.autorasqr.xuimanager.ui.appearance.AppearanceScreen
 import dev.autorasqr.xuimanager.ui.clients.ClientsScreen
 import dev.autorasqr.xuimanager.ui.deploy.DeployScreen
@@ -23,6 +26,8 @@ import dev.autorasqr.xuimanager.ui.servers.ServerEditScreen
 import dev.autorasqr.xuimanager.ui.servers.ServerHomeScreen
 import dev.autorasqr.xuimanager.ui.subscription.SubscriptionScreen
 import dev.autorasqr.xuimanager.ui.servers.UninstallScreen
+import dev.autorasqr.xuimanager.ui.transfer.TransferExportScreen
+import dev.autorasqr.xuimanager.ui.transfer.TransferImportScreen
 import kotlinx.serialization.Serializable
 
 /** Start destination; forwards to the server screen or to onboarding. */
@@ -91,9 +96,29 @@ data class MoreRoute(val serverId: Long)
 @Serializable
 object AppearanceRoute
 
+/** Shows every server of the app as QR codes and a link for another phone. */
+@Serializable
+object TransferExportRoute
+
+/** Takes servers from another phone; [link] is prefilled when the app was opened from a transfer link. */
+@Serializable
+data class TransferImportRoute(val link: String = "")
+
+/**
+ * [pendingLink] is a transfer link the app was opened with (xuimanager://import?…); it opens the import screen once and
+ * is then reported through [onLinkHandled].
+ */
 @Composable
-fun AppNavHost() {
+fun AppNavHost(pendingLink: String? = null, onLinkHandled: () -> Unit = {}) {
     val nav = rememberNavController()
+    LaunchedEffect(pendingLink) {
+        if (pendingLink != null) {
+            // After the start destination has replaced itself, or it would pop the import screen along with itself.
+            nav.currentBackStackEntryFlow.first { !it.destination.hasRoute<HomeRoute>() }
+            nav.navigate(TransferImportRoute(pendingLink)) { launchSingleTop = true }
+            onLinkHandled()
+        }
+    }
     NavHost(navController = nav, startDestination = HomeRoute) {
         composable<HomeRoute> {
             HomeScreen(
@@ -108,6 +133,7 @@ fun AppNavHost() {
             val addingNode = route.masterServerId > 0
             ServerEditScreen(
                 onBack = if (canGoBack) ({ nav.popBackStack() }) else null,
+                onTransfer = { nav.navigate(TransferImportRoute()) },
                 onCreated = { id ->
                     // A new node server goes straight to its deployment, which registers it on the master afterwards;
                     // a node that is already on the master is restored instead.
@@ -168,6 +194,8 @@ fun AppNavHost() {
                             onOpenPanel = { id -> nav.navigate(PanelRoute(id)) },
                             onServerSettings = { id -> nav.navigate(ServerEditRoute(id)) },
                             onAppearance = { nav.navigate(AppearanceRoute) },
+                            onTransferExport = { nav.navigate(TransferExportRoute) },
+                            onTransferImport = { nav.navigate(TransferImportRoute()) },
                         )
                     }
                 },
@@ -178,6 +206,17 @@ fun AppNavHost() {
         }
         composable<AppearanceRoute> {
             AppearanceScreen(onBack = { nav.popBackStack() })
+        }
+        composable<TransferExportRoute> {
+            TransferExportScreen(onBack = { nav.popBackStack() })
+        }
+        composable<TransferImportRoute> {
+            // Opened from a link on a phone without servers it is the only screen; otherwise it has a way back.
+            val canGoBack = nav.previousBackStackEntry != null
+            TransferImportScreen(
+                onBack = if (canGoBack) ({ nav.popBackStack() }) else null,
+                onDone = { id -> nav.navigate(ServerDetailRoute(id)) { popUpTo(nav.graph.id) { inclusive = true } } },
+            )
         }
         composable<NodeEditRoute> {
             NodeEditScreen(onBack = { nav.popBackStack() }, onSaved = { nav.popBackStack() })

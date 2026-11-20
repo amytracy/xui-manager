@@ -13,7 +13,7 @@ import dev.autorasqr.xuimanager.domain.model.SshAuthType
 
 @Database(
     entities = [ServerEntity::class, DeployJobEntity::class],
-    version = 4,
+    version = 7,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2, spec = AppDatabase.DropCertificatePin::class),
@@ -21,6 +21,9 @@ import dev.autorasqr.xuimanager.domain.model.SshAuthType
         AutoMigration(from = 2, to = 3),
         // Version 4: servers deployed as nodes of another server's panel.
         AutoMigration(from = 3, to = 4),
+        // Versions 5 and 6 belonged to the removed Simple CDN mode; 6 -> 7 is MIGRATION_6_7.
+        AutoMigration(from = 4, to = 5),
+        AutoMigration(from = 5, to = 6),
     ],
 )
 @TypeConverters(Converters::class)

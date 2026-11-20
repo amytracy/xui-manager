@@ -65,6 +65,8 @@ fun MoreScreen(
     onOpenPanel: (Long) -> Unit,
     onServerSettings: (Long) -> Unit,
     onAppearance: () -> Unit,
+    onTransferExport: () -> Unit,
+    onTransferImport: () -> Unit,
     viewModel: MoreViewModel = hiltViewModel(),
 ) {
     val subscriptionSettings by viewModel.subscriptionSettings.collectAsStateWithLifecycle()
@@ -91,6 +93,12 @@ fun MoreScreen(
                 listOf(
                     MenuEntry(stringResource(R.string.server_settings), stringResource(R.string.more_server_settings_text)) { onServerSettings(id) },
                     MenuEntry(stringResource(R.string.appearance_title), stringResource(R.string.more_appearance_text), onAppearance),
+                ),
+            )
+            MenuGroup(
+                listOf(
+                    MenuEntry(stringResource(R.string.more_transfer_export), stringResource(R.string.more_transfer_export_text), onTransferExport),
+                    MenuEntry(stringResource(R.string.more_transfer_import), stringResource(R.string.more_transfer_import_text), onTransferImport),
                 ),
             )
         }

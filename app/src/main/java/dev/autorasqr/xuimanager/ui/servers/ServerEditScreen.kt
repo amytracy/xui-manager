@@ -70,6 +70,8 @@ import dev.autorasqr.xuimanager.ui.common.messageRes
 fun ServerEditScreen(
     /** Null when this is the first screen (onboarding): there is nothing to go back to. */
     onBack: (() -> Unit)?,
+    /** Onboarding only: takes the servers from another phone instead. */
+    onTransfer: () -> Unit,
     onCreated: (Long) -> Unit,
     onUpdated: () -> Unit,
     onDeleted: (wasNode: Boolean) -> Unit,
@@ -158,6 +160,11 @@ fun ServerEditScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                if (onBack == null) {
+                    OutlinedButton(onClick = onTransfer, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.onboarding_transfer))
+                    }
                 }
             }
             Field(

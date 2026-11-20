@@ -17,6 +17,7 @@ okhttp = "5.5.0"
 sshj = "0.41.2"
 bouncycastle = "1.84"
 zxing = "3.5.4"
+camerax = "1.6.2"
 junit = "4.13.2"
 minaSshd = "2.20.0"
 webkit = "1.17.1"
@@ -61,6 +62,9 @@ sshj = { module = "com.hierynomus:sshj", version.ref = "sshj" }
 bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
 mina-sshd-core = { module = "org.apache.sshd:sshd-core", version.ref = "minaSshd" }

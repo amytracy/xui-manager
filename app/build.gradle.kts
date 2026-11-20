@@ -39,8 +39,8 @@ android {
         applicationId = "dev.autorasqr.xuimanager"
         minSdk = 26
         targetSdk = 36
-        versionCode = 17
-        versionName = "1.0.0"
+        versionCode = 20
+        versionName = "1.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -128,6 +128,9 @@ dependencies {
     implementation(libs.bouncycastle.prov)
     implementation(libs.bouncycastle.pkix)
     implementation(libs.zxing.core)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.view)
     implementation(libs.androidx.webkit)
 
     testImplementation(libs.junit)
