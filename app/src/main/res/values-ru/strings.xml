@@ -529,7 +529,6 @@
     <string name="error_reboot_timeout">Сервер не вернулся за 6 минут. Проверьте его в панели хостинга.</string>
     <string name="action_restart_panel">Перезапустить панель</string>
     <string name="action_reboot_server">Перезагрузить сервер</string>
-    <string name="action_reboot_short">Перезагрузить</string>
     <string name="panel_restart_title">Перезапустить панель?</string>
     <string name="panel_restart_text">3x-ui перезапустится и вернётся примерно через 10 секунд. VPN-подключения могут прерваться на несколько секунд.</string>
     <string name="panel_restart_confirm">Перезапустить</string>
@@ -595,4 +594,28 @@
     <string name="transfer_error_newer">На другом телефоне более новая версия приложения. Сначала обновите это.</string>
     <string name="transfer_error_other">Считан QR-код другого переноса. Начните сканирование заново.</string>
     <string name="transfer_error_save">Не удалось сохранить серверы. Попробуйте ещё раз.</string>
+
+    <!-- Управление нодами -->
+    <string name="node_manage">Управление</string>
+    <string name="node_needs_ssh">SSH</string>
+    <string name="node_menu_update_panel">Обновить 3x-ui</string>
+    <string name="node_menu_update_xray">Обновить Xray</string>
+    <string name="node_menu_web_panel">Веб-панель</string>
+    <string name="node_menu_server">Экран сервера</string>
+    <string name="node_update_line">%1$s: %2$s → %3$s</string>
+    <string name="node_panel_up_to_date">На ноде последняя версия 3x-ui</string>
+    <string name="node_xray_up_to_date">На ноде последняя версия Xray</string>
+    <string name="node_panel_update_text">3x-ui на %1$s обновится с %2$s до %3$s через главную панель (официальный update.sh, настройки и сертификаты сохранятся). Нода будет недоступна около минуты.</string>
+    <string name="nodes_bulk">Все ноды</string>
+    <string name="nodes_bulk_title">Действие на всех нодах</string>
+    <string name="nodes_bulk_text">Выполняется по очереди на всех включённых нодах. Ноды без SSH в приложении пропускаются — кроме обновления 3x-ui, оно идёт через главную панель.</string>
+    <string name="nodes_bulk_confirm_title">%1$s на всех нодах?</string>
+    <string name="nodes_bulk_confirm_text">Ноды обрабатываются по одной; ошибка на одной не останавливает остальные. VPN-подключения через ноду могут прерваться, пока до неё дошла очередь.</string>
+    <string name="nodes_bulk_confirm_panel">Главная панель обновит 3x-ui на всех нодах со старой версией. Сама главная панель не обновляется. Ноды будут недоступны около минуты.</string>
+    <string name="nodes_bulk_confirm">Выполнить</string>
+    <string name="nodes_bulk_running">%1$s: все ноды…</string>
+    <string name="nodes_bulk_done">%1$s: готово на всех нодах</string>
+    <string name="nodes_bulk_failed">%1$s: не на всех нодах</string>
+    <string name="error_node_actions">Не получилось на нодах: %1$s. Подробности в журнале.</string>
+    <string name="error_node_web_http">Главная панель подключается к этой ноде по HTTP без шифрования. Приложение открывает панели только по HTTPS.</string>
 </resources>

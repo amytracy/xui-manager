@@ -531,7 +531,6 @@
     <string name="error_reboot_timeout">The server did not come back within 6 minutes. Check it in your hosting provider\'s control panel.</string>
     <string name="action_restart_panel">Restart panel</string>
     <string name="action_reboot_server">Reboot server</string>
-    <string name="action_reboot_short">Reboot</string>
     <string name="panel_restart_title">Restart the panel?</string>
     <string name="panel_restart_text">3x-ui restarts and is back in about 10 seconds. VPN connections may drop for a few seconds.</string>
     <string name="panel_restart_confirm">Restart</string>
@@ -599,4 +598,28 @@
     <string name="transfer_error_newer">The other phone has a newer version of the app. Update this one first.</string>
     <string name="transfer_error_other">A QR code of another transfer was read. Start the scan again.</string>
     <string name="transfer_error_save">Couldn\'t save the servers. Try again.</string>
+
+    <!-- Node management -->
+    <string name="node_manage">Manage</string>
+    <string name="node_needs_ssh">SSH</string>
+    <string name="node_menu_update_panel">Update 3x-ui</string>
+    <string name="node_menu_update_xray">Update Xray</string>
+    <string name="node_menu_web_panel">Web panel</string>
+    <string name="node_menu_server">Server screen</string>
+    <string name="node_update_line">%1$s: %2$s → %3$s</string>
+    <string name="node_panel_up_to_date">The node runs the latest 3x-ui</string>
+    <string name="node_xray_up_to_date">The node runs the latest Xray</string>
+    <string name="node_panel_update_text">3x-ui on %1$s will be updated from %2$s to %3$s through the main panel (the official update.sh; settings and certificates stay). The node is unavailable for about a minute.</string>
+    <string name="nodes_bulk">All nodes</string>
+    <string name="nodes_bulk_title">Action on every node</string>
+    <string name="nodes_bulk_text">Runs on every enabled node, one after another. Nodes the app has no SSH access to are skipped, except for the 3x-ui update, which goes through the main panel.</string>
+    <string name="nodes_bulk_confirm_title">%1$s on every node?</string>
+    <string name="nodes_bulk_confirm_text">Nodes are handled one at a time; an error on one node does not stop the rest. VPN connections through a node may drop while it has its turn.</string>
+    <string name="nodes_bulk_confirm_panel">The main panel updates 3x-ui on every node with an older version. The main panel itself is not updated. The nodes are unavailable for about a minute.</string>
+    <string name="nodes_bulk_confirm">Run</string>
+    <string name="nodes_bulk_running">%1$s: all nodes…</string>
+    <string name="nodes_bulk_done">%1$s: done on every node</string>
+    <string name="nodes_bulk_failed">%1$s: not done on every node</string>
+    <string name="error_node_actions">Failed on: %1$s. Details are in the log.</string>
+    <string name="error_node_web_http">The main panel reaches this node over plain HTTP. The app opens panels over HTTPS only.</string>
 </resources>

@@ -1,6 +1,18 @@
 package dev.autorasqr.xuimanager.ui.nodes
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,7 +71,10 @@ import dev.autorasqr.xuimanager.domain.model.DeployState
 import dev.autorasqr.xuimanager.domain.model.Node
 import dev.autorasqr.xuimanager.domain.model.NodeStatus
 import dev.autorasqr.xuimanager.domain.model.PendingNode
-import dev.autorasqr.xuimanager.domain.model.RebootProgress
+import dev.autorasqr.xuimanager.domain.model.NodeAction
+import dev.autorasqr.xuimanager.domain.model.NodePanelOffer
+import dev.autorasqr.xuimanager.domain.model.XrayUpdateOffer
+import dev.autorasqr.xuimanager.ui.common.JobLog
 import dev.autorasqr.xuimanager.ui.common.AppTopBar
 import dev.autorasqr.xuimanager.ui.common.Formatters
 import dev.autorasqr.xuimanager.ui.common.appBarScrollBehavior
@@ -77,10 +92,19 @@ fun NodesScreen(
     onServer: (serverId: Long) -> Unit,
     onDeploy: (serverId: Long) -> Unit,
     onConnectSsh: (masterId: Long, node: Node) -> Unit,
+    /** The node's web panel: [nodeId] 0 means [serverId] is the node's own server in the app. */
+    onOpenPanel: (serverId: Long, nodeId: Int) -> Unit,
     viewModel: NodesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val bulkJob by viewModel.bulkProgress.collectAsStateWithLifecycle()
+    LaunchedEffect(bulkJob?.state) {
+        val finished = bulkJob?.state
+        if (finished == DeployState.SUCCEEDED || finished == DeployState.FAILED) viewModel.onJobFinished()
+    }
     val snackbar = remember { SnackbarHostState() }
+    // Not tied to the message effect: consuming the message restarts that effect, which would dismiss the snackbar at once.
+    val snackbarScope = rememberCoroutineScope()
     val context = LocalContext.current
     val resources = LocalResources.current
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.startUpdates() }
@@ -100,7 +124,7 @@ fun NodesScreen(
             else -> null
         }
         viewModel.consumeMessage()
-        if (text != null) snackbar.showSnackbar(text)
+        if (text != null) snackbarScope.launch { snackbar.showSnackbar(text) }
     }
 
     val appBarScroll = appBarScrollBehavior()
@@ -118,6 +142,12 @@ fun NodesScreen(
                     }
                 },
                 actions = {
+                    val hasNodes = state.snapshot?.nodes.orEmpty().any { !it.transitive }
+                    if (hasNodes) {
+                        TextButton(onClick = viewModel::openBulk, enabled = bulkJob?.state != DeployState.RUNNING) {
+                            Text(stringResource(R.string.nodes_bulk))
+                        }
+                    }
                     IconButton(onClick = viewModel::refresh, enabled = !state.refreshing) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                     }
@@ -159,6 +189,20 @@ fun NodesScreen(
                 state.error?.let { error ->
                     item { Text(error.message(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
                 }
+                bulkJob?.let { job ->
+                    item(key = "bulk") {
+                        val label = stringResource(actionLabel(job.action))
+                        JobLog(
+                            title = when (job.state) {
+                                DeployState.RUNNING -> stringResource(R.string.nodes_bulk_running, label)
+                                DeployState.SUCCEEDED -> stringResource(R.string.nodes_bulk_done, label)
+                                DeployState.FAILED -> stringResource(R.string.nodes_bulk_failed, label)
+                            },
+                            state = job.state, log = job.log, error = job.error,
+                            onDismiss = viewModel::dismissBulkJob,
+                        )
+                    }
+                }
                 if (snapshot.nodes.isEmpty() && snapshot.pending.isEmpty()) {
                     item {
                         Text(
@@ -181,16 +225,21 @@ fun NodesScreen(
                 items(snapshot.nodes, key = { it.key }) { node ->
                     NodeCard(
                         node = node,
-                        busy = node.key in state.busy,
+                        busy = node.key in state.busy || bulkJob?.state == DeployState.RUNNING,
+                        panelOffer = state.panelOffers[node.id],
+                        xrayOffer = node.serverId?.let { state.xrayOffers[it] },
                         onEnabled = { viewModel.setEnabled(node, it) },
                         onProbe = { viewModel.probe(node) },
                         onEdit = { onEdit(viewModel.serverId, node.id) },
                         onServer = node.serverId?.let { id -> { onServer(id) } },
                         onConnectSsh = { onConnectSsh(viewModel.serverId, node) },
                         onDelete = { viewModel.requestDelete(node) },
-                        onPower = { action -> viewModel.requestPower(node, action) },
-                        reboot = node.serverId?.let { id -> viewModel.rebootProgress(id).collectAsStateWithLifecycle().value },
-                        onDismissReboot = { node.serverId?.let(viewModel::dismissReboot) },
+                        onAction = { action -> viewModel.requestAction(node, action) },
+                        onOpenPanel = {
+                            val id = node.serverId
+                            if (id != null) onOpenPanel(id, 0) else onOpenPanel(viewModel.serverId, node.id)
+                        },
+                        viewModel = viewModel,
                     )
                 }
             }
@@ -236,23 +285,96 @@ fun NodesScreen(
         )
     }
 
-    state.confirmPower?.let { (node, action) ->
+    state.confirmAction?.let { request ->
+        val name = request.node.name
+        val (title, text, confirm) = when (request.action) {
+            NodeAction.RESTART_XRAY -> Triple(
+                stringResource(R.string.status_restart_title),
+                stringResource(R.string.status_restart_text),
+                stringResource(R.string.status_restart_confirm),
+            )
+            NodeAction.RESTART_PANEL -> Triple(
+                stringResource(R.string.panel_restart_title),
+                stringResource(R.string.panel_restart_text),
+                stringResource(R.string.panel_restart_confirm),
+            )
+            NodeAction.UPDATE_PANEL -> Triple(
+                stringResource(R.string.panel_update_title),
+                request.panelOffer?.let { stringResource(R.string.node_panel_update_text, name, it.currentVersion, it.latestVersion) }.orEmpty(),
+                stringResource(R.string.panel_update_confirm),
+            )
+            NodeAction.UPDATE_XRAY -> Triple(
+                stringResource(R.string.xray_update_title),
+                request.xrayOffer?.let { stringResource(R.string.xray_update_text, it.latestVersion, it.currentVersion.ifBlank { "?" }) }.orEmpty(),
+                stringResource(R.string.panel_update_confirm),
+            )
+            NodeAction.SYSTEM_UPDATE -> Triple(
+                stringResource(R.string.sysupdate_confirm_title),
+                stringResource(R.string.sysupdate_confirm_text, name),
+                stringResource(R.string.sysupdate_confirm),
+            )
+            NodeAction.REBOOT -> Triple(
+                stringResource(R.string.reboot_confirm_title),
+                stringResource(R.string.reboot_confirm_text, name),
+                stringResource(R.string.reboot_confirm),
+            )
+        }
         AlertDialog(
-            onDismissRequest = viewModel::dismissPower,
-            title = { Text(stringResource(if (action == PowerAction.REBOOT) R.string.reboot_confirm_title else R.string.panel_restart_title)) },
+            onDismissRequest = viewModel::dismissAction,
+            title = { Text(title) },
+            text = { Text(text) },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmAction) {
+                    Text(confirm, color = if (request.action == NodeAction.REBOOT) MaterialTheme.colorScheme.error else Color.Unspecified)
+                }
+            },
+            dismissButton = { TextButton(onClick = viewModel::dismissAction) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
+    if (state.bulkChooser) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissBulkChooser,
+            title = { Text(stringResource(R.string.nodes_bulk_title)) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(stringResource(R.string.nodes_bulk_text), style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(8.dp))
+                    NodeAction.entries.forEach { action ->
+                        TextButton(onClick = { viewModel.requestBulk(action) }, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                stringResource(actionLabel(action)),
+                                color = if (action == NodeAction.REBOOT) MaterialTheme.colorScheme.error else Color.Unspecified,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = viewModel::dismissBulkChooser) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
+    state.confirmBulk?.let { action ->
+        val label = stringResource(actionLabel(action))
+        AlertDialog(
+            onDismissRequest = viewModel::dismissBulk,
+            title = { Text(stringResource(R.string.nodes_bulk_confirm_title, label)) },
             text = {
                 Text(
-                    if (action == PowerAction.REBOOT) stringResource(R.string.reboot_confirm_text, node.name)
-                    else stringResource(R.string.panel_restart_text),
+                    stringResource(if (action == NodeAction.UPDATE_PANEL) R.string.nodes_bulk_confirm_panel else R.string.nodes_bulk_confirm_text),
                 )
             },
             confirmButton = {
-                TextButton(onClick = viewModel::confirmPower) {
-                    if (action == PowerAction.REBOOT) Text(stringResource(R.string.reboot_confirm), color = MaterialTheme.colorScheme.error)
-                    else Text(stringResource(R.string.panel_restart_confirm))
+                TextButton(onClick = viewModel::confirmBulk) {
+                    Text(
+                        stringResource(R.string.nodes_bulk_confirm),
+                        color = if (action == NodeAction.REBOOT) MaterialTheme.colorScheme.error else Color.Unspecified,
+                    )
                 }
             },
-            dismissButton = { TextButton(onClick = viewModel::dismissPower) { Text(stringResource(R.string.cancel)) } },
+            dismissButton = { TextButton(onClick = viewModel::dismissBulk) { Text(stringResource(R.string.cancel)) } },
         )
     }
 
@@ -273,20 +395,32 @@ fun NodesScreen(
 private fun NodeCard(
     node: Node,
     busy: Boolean,
+    panelOffer: NodePanelOffer?,
+    xrayOffer: XrayUpdateOffer?,
     onEnabled: (Boolean) -> Unit,
     onProbe: () -> Unit,
     onEdit: () -> Unit,
     onServer: (() -> Unit)?,
     onConnectSsh: () -> Unit,
     onDelete: () -> Unit,
-    onPower: (PowerAction) -> Unit,
-    /** Reboot of the node's own server; null for nodes without one or when none ran. */
-    reboot: RebootProgress?,
-    onDismissReboot: () -> Unit,
+    onAction: (NodeAction) -> Unit,
+    onOpenPanel: () -> Unit,
+    viewModel: NodesViewModel,
 ) {
     val context = LocalContext.current
-    val rebooting = reboot?.state == DeployState.RUNNING
-    Card(Modifier.fillMaxWidth()) {
+    val nodeServerId = node.serverId
+    // Jobs on the node: its own server's (shared with that server's screen) and the 3x-ui update through the master.
+    val reboot = nodeServerId?.let { viewModel.rebootProgress(it).collectAsStateWithLifecycle().value }
+    val system = nodeServerId?.let { viewModel.systemProgress(it).collectAsStateWithLifecycle().value }
+    val xray = nodeServerId?.let { viewModel.xrayProgress(it).collectAsStateWithLifecycle().value }
+    val panel by viewModel.panelProgress(node.id).collectAsStateWithLifecycle()
+    val jobRunning = listOf(reboot?.state, system?.state, xray?.state, panel?.state).any { it == DeployState.RUNNING }
+    val jobStates = listOf(reboot?.state, system?.state, xray?.state, panel?.state)
+    LaunchedEffect(jobStates) {
+        if (jobStates.any { it == DeployState.SUCCEEDED || it == DeployState.FAILED }) viewModel.onJobFinished()
+    }
+
+    val content: @Composable () -> Unit = {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StatusDot(node.status)
@@ -295,7 +429,7 @@ private fun NodeCard(
                     Text(node.name, style = MaterialTheme.typography.titleMedium)
                     Text(statusText(node), style = MaterialTheme.typography.bodySmall, color = statusColor(node.status))
                 }
-                if (busy) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                if (busy || jobRunning) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 if (!node.transitive) Switch(checked = node.enabled, onCheckedChange = onEnabled, enabled = !busy)
             }
             Text(node.url, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
@@ -320,6 +454,20 @@ private fun NodeCard(
                 if (node.xrayError.isNotBlank()) Text(node.xrayError, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 if (node.panelVersion.isNotBlank()) InfoRow(stringResource(R.string.panel_version), node.panelVersion)
             }
+            panelOffer?.let {
+                Text(
+                    stringResource(R.string.node_update_line, "3x-ui", it.currentVersion, it.latestVersion),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            xrayOffer?.let {
+                Text(
+                    stringResource(R.string.node_update_line, "Xray", it.currentVersion.ifBlank { "?" }, it.latestVersion),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
             InfoRow(
                 stringResource(R.string.node_counts),
                 stringResource(R.string.node_counts_value, node.inboundCount, node.clientCount, node.onlineCount),
@@ -331,44 +479,129 @@ private fun NodeCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(onClick = onProbe, enabled = !busy) { Text(stringResource(R.string.node_probe)) }
                     OutlinedButton(onClick = onEdit, enabled = !busy) { Text(stringResource(R.string.edit)) }
-                    if (onServer != null) TextButton(onClick = onServer) { Text(stringResource(R.string.node_server)) }
+                    ManageMenu(
+                        hasSsh = nodeServerId != null,
+                        enabled = !busy && !jobRunning,
+                        panelOffer = panelOffer,
+                        xrayOffer = xrayOffer,
+                        onAction = { action -> if (action.needsSsh && nodeServerId == null) onConnectSsh() else onAction(action) },
+                        onOpenPanel = onOpenPanel,
+                        onServer = onServer,
+                    )
                     Spacer(Modifier.weight(1f))
                     IconButton(onClick = onDelete, enabled = !busy) {
                         Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
                     }
                 }
                 // A node the app has no SSH access to (added by hand, or deployed from another phone).
-                if (onServer == null) {
+                if (nodeServerId == null) {
                     TextButton(onClick = onConnectSsh, enabled = !busy) { Text(stringResource(R.string.node_connect_ssh)) }
-                } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { onPower(PowerAction.RESTART_PANEL) }, enabled = !busy && !rebooting) {
-                            Text(stringResource(R.string.action_restart_panel))
-                        }
-                        OutlinedButton(onClick = { onPower(PowerAction.REBOOT) }, enabled = !busy && !rebooting) {
-                            Text(stringResource(R.string.action_reboot_short))
-                        }
-                    }
                 }
             }
-            reboot?.let { job ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        when (job.state) {
-                            DeployState.RUNNING -> stringResource(R.string.reboot_running)
-                            DeployState.SUCCEEDED -> stringResource(R.string.reboot_done)
-                            DeployState.FAILED -> job.error?.message() ?: stringResource(R.string.reboot_failed)
+            panel?.let { job ->
+                JobLog(
+                    title = when (job.state) {
+                        DeployState.RUNNING -> stringResource(R.string.panel_update_running, job.targetVersion)
+                        DeployState.SUCCEEDED -> stringResource(R.string.panel_update_done, job.targetVersion)
+                        DeployState.FAILED -> stringResource(R.string.panel_update_failed)
+                    },
+                    state = job.state, log = job.log, error = job.error,
+                    onDismiss = { viewModel.dismissPanel(node.id) },
+                )
+            }
+            if (nodeServerId != null) {
+                xray?.let { job ->
+                    JobLog(
+                        title = when (job.state) {
+                            DeployState.RUNNING -> stringResource(R.string.xray_update_running, job.targetVersion)
+                            DeployState.SUCCEEDED -> stringResource(R.string.xray_update_done, job.targetVersion)
+                            DeployState.FAILED -> stringResource(R.string.xray_update_failed)
                         },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = when (job.state) {
-                            DeployState.RUNNING -> MaterialTheme.colorScheme.onSurfaceVariant
-                            DeployState.SUCCEEDED -> LocalStatusColors.current.success
-                            DeployState.FAILED -> MaterialTheme.colorScheme.error
-                        },
-                        modifier = Modifier.weight(1f),
+                        state = job.state, log = job.log, error = job.error,
+                        onDismiss = { viewModel.dismissXray(nodeServerId) },
                     )
-                    if (job.state != DeployState.RUNNING) TextButton(onClick = onDismissReboot) { Text(stringResource(R.string.close)) }
                 }
+                system?.let { job ->
+                    JobLog(
+                        title = stringResource(
+                            when (job.state) {
+                                DeployState.RUNNING -> R.string.sysupdate_running
+                                DeployState.SUCCEEDED -> if (job.rebooting) R.string.sysupdate_rebooting else R.string.sysupdate_done
+                                DeployState.FAILED -> R.string.sysupdate_failed
+                            },
+                        ),
+                        state = job.state, log = job.log, error = job.error,
+                        onDismiss = { viewModel.dismissSystem(nodeServerId) },
+                    )
+                }
+                reboot?.let { job ->
+                    JobLog(
+                        title = stringResource(
+                            when (job.state) {
+                                DeployState.RUNNING -> R.string.reboot_running
+                                DeployState.SUCCEEDED -> R.string.reboot_done
+                                DeployState.FAILED -> R.string.reboot_failed
+                            },
+                        ),
+                        state = job.state, log = job.log, error = job.error,
+                        onDismiss = { viewModel.dismissReboot(nodeServerId) },
+                    )
+                }
+            }
+        }
+    }
+    // A node with its own server in the app opens that server's screen on tap.
+    if (onServer != null) Card(onClick = onServer, modifier = Modifier.fillMaxWidth()) { content() } else Card(Modifier.fillMaxWidth()) { content() }
+}
+
+/** Everything that can be done to a node; the SSH-only actions of a node without SSH lead to "Connect over SSH". */
+@Composable
+private fun ManageMenu(
+    hasSsh: Boolean,
+    enabled: Boolean,
+    panelOffer: NodePanelOffer?,
+    xrayOffer: XrayUpdateOffer?,
+    onAction: (NodeAction) -> Unit,
+    onOpenPanel: () -> Unit,
+    onServer: (() -> Unit)?,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { open = true }, enabled = enabled) {
+            Text(stringResource(R.string.node_manage))
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            val sshHint: (@Composable () -> Unit)? = if (hasSsh) null else ({
+                Text(stringResource(R.string.node_needs_ssh), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            })
+            fun item(action: NodeAction): () -> Unit = { open = false; onAction(action) }
+            DropdownMenuItem(text = { Text(stringResource(R.string.status_restart_xray)) }, onClick = item(NodeAction.RESTART_XRAY), trailingIcon = sshHint)
+            DropdownMenuItem(text = { Text(stringResource(R.string.action_restart_panel)) }, onClick = item(NodeAction.RESTART_PANEL), trailingIcon = sshHint)
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = {
+                    Text(panelOffer?.let { stringResource(R.string.action_update_panel, it.latestVersion) } ?: stringResource(R.string.node_menu_update_panel))
+                },
+                onClick = item(NodeAction.UPDATE_PANEL),
+            )
+            DropdownMenuItem(
+                text = {
+                    Text(xrayOffer?.let { stringResource(R.string.action_update_xray, it.latestVersion) } ?: stringResource(R.string.node_menu_update_xray))
+                },
+                onClick = item(NodeAction.UPDATE_XRAY),
+                trailingIcon = sshHint,
+            )
+            DropdownMenuItem(text = { Text(stringResource(R.string.action_system_update)) }, onClick = item(NodeAction.SYSTEM_UPDATE), trailingIcon = sshHint)
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_reboot_server), color = MaterialTheme.colorScheme.error) },
+                onClick = item(NodeAction.REBOOT),
+                trailingIcon = sshHint,
+            )
+            HorizontalDivider()
+            DropdownMenuItem(text = { Text(stringResource(R.string.node_menu_web_panel)) }, onClick = { open = false; onOpenPanel() })
+            if (onServer != null) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.node_menu_server)) }, onClick = { open = false; onServer() })
             }
         }
     }
@@ -410,6 +643,16 @@ private fun PendingCard(
             }
         }
     }
+}
+
+@StringRes
+private fun actionLabel(action: NodeAction): Int = when (action) {
+    NodeAction.RESTART_XRAY -> R.string.status_restart_xray
+    NodeAction.RESTART_PANEL -> R.string.action_restart_panel
+    NodeAction.UPDATE_PANEL -> R.string.node_menu_update_panel
+    NodeAction.UPDATE_XRAY -> R.string.node_menu_update_xray
+    NodeAction.SYSTEM_UPDATE -> R.string.action_system_update
+    NodeAction.REBOOT -> R.string.action_reboot_server
 }
 
 @Composable

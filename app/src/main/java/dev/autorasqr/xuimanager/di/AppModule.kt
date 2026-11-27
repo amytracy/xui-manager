@@ -28,6 +28,7 @@ import dev.autorasqr.xuimanager.data.repository.PanelUpdateRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.PanelWebRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.RestoreRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.RoutingRepositoryImpl
+import dev.autorasqr.xuimanager.data.repository.NodeBulkRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.ServerPowerRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.ServerRepositoryImpl
 import dev.autorasqr.xuimanager.data.repository.SubscriptionRepositoryImpl
@@ -50,6 +51,7 @@ import dev.autorasqr.xuimanager.domain.repository.PanelUpdateRepository
 import dev.autorasqr.xuimanager.domain.repository.PanelWebRepository
 import dev.autorasqr.xuimanager.domain.repository.RestoreRepository
 import dev.autorasqr.xuimanager.domain.repository.RoutingRepository
+import dev.autorasqr.xuimanager.domain.repository.NodeBulkRepository
 import dev.autorasqr.xuimanager.domain.repository.ServerPowerRepository
 import dev.autorasqr.xuimanager.domain.repository.ServerRepository
 import dev.autorasqr.xuimanager.domain.repository.SubscriptionRepository
@@ -101,6 +103,7 @@ abstract class BindingsModule {
     @Binds abstract fun panelUpdateRepository(impl: PanelUpdateRepositoryImpl): PanelUpdateRepository
     @Binds abstract fun systemUpdateRepository(impl: SystemUpdateRepositoryImpl): SystemUpdateRepository
     @Binds abstract fun serverPowerRepository(impl: ServerPowerRepositoryImpl): ServerPowerRepository
+    @Binds abstract fun nodeBulkRepository(impl: NodeBulkRepositoryImpl): NodeBulkRepository
     @Binds abstract fun subscriptionRepository(impl: SubscriptionRepositoryImpl): SubscriptionRepository
     @Binds abstract fun uninstallRepository(impl: UninstallRepositoryImpl): UninstallRepository
     @Binds abstract fun restoreRepository(impl: RestoreRepositoryImpl): RestoreRepository

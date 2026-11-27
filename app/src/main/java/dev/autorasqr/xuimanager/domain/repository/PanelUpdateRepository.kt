@@ -1,5 +1,6 @@
 package dev.autorasqr.xuimanager.domain.repository
 
+import dev.autorasqr.xuimanager.domain.model.NodePanelOffer
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateOffer
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateProgress
 import dev.autorasqr.xuimanager.domain.model.UpdateCheck
@@ -21,4 +22,9 @@ interface PanelUpdateRepository {
     fun start(serverId: Long, offer: PanelUpdateOffer)
     fun progress(serverId: Long): StateFlow<PanelUpdateProgress?>
     fun clearProgress(serverId: Long)
+
+    /** Updates 3x-ui on one node through the main panel (works without SSH to the node). Runs in the background. */
+    fun startNode(masterId: Long, offer: NodePanelOffer)
+    fun nodeProgress(masterId: Long, nodeId: Int): StateFlow<PanelUpdateProgress?>
+    fun clearNodeProgress(masterId: Long, nodeId: Int)
 }

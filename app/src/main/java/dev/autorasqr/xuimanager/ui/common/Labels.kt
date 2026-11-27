@@ -144,6 +144,8 @@ fun AppError.message(context: Context): String = when (this) {
         },
         cause.message(context),
     )
+    is AppError.NodeActionsFailed -> context.getString(R.string.error_node_actions, nodes)
+    AppError.NodeWebNotHttps -> context.getString(R.string.error_node_web_http)
     is AppError.RebootFailed -> context.getString(if (detail == "timeout") R.string.error_reboot_timeout else R.string.error_reboot)
     AppError.PanelUnauthorized -> context.getString(R.string.error_panel_unauthorized)
     AppError.PanelNotFound -> context.getString(R.string.error_panel_not_found)

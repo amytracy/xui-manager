@@ -13,7 +13,9 @@ import dev.autorasqr.xuimanager.data.secure.SecretStore
 import dev.autorasqr.xuimanager.domain.model.AppError
 import dev.autorasqr.xuimanager.domain.model.AppException
 import dev.autorasqr.xuimanager.domain.model.PanelWebSession
+import dev.autorasqr.xuimanager.domain.repository.NodeRepository
 import dev.autorasqr.xuimanager.domain.repository.PanelWebRepository
+import okhttp3.HttpUrl
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,6 +26,7 @@ class PanelWebRepositoryImpl @Inject constructor(
     private val secrets: SecretStore,
     private val httpClients: PanelHttpClientFactory,
     private val json: Json,
+    private val nodes: NodeRepository,
 ) : PanelWebRepository {
 
     override suspend fun openSession(serverId: Long): PanelWebSession = ioMapped {
@@ -54,6 +57,26 @@ class PanelWebRepositoryImpl @Inject constructor(
             startUrl = if (loginError == null) base.resolve("panel/")!!.toString() else base.toString(),
             cookies = if (loginError == null) cookies.loadForRequest(base).map { it.toString() } else emptyList(),
             loginError = loginError,
+        )
+    }
+
+    override suspend fun openNodeSession(masterId: Long, nodeId: Int): PanelWebSession = ioMapped {
+        val node = nodes.get(masterId, nodeId) ?: throw AppException(AppError.Unexpected("node not found"))
+        // The in-app browser only ever opens a panel over HTTPS with a certificate the phone trusts.
+        if (!node.scheme.equals("https", ignoreCase = true)) throw AppException(AppError.NodeWebNotHttps)
+        val base = HttpUrl.Builder()
+            .scheme("https")
+            .host(node.address)
+            .port(node.port)
+            .apply { node.basePath.split('/').filter { it.isNotEmpty() }.forEach(::addPathSegment) }
+            .addPathSegment("")
+            .build()
+        PanelWebSession(
+            serverName = node.name,
+            origin = base.toString(),
+            startUrl = base.toString(),
+            cookies = emptyList(),
+            loginError = null,
         )
     }
 }

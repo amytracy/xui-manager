@@ -417,25 +417,23 @@ private fun UpdatesCard(
 
             val panel = server.panel
             if (panel != null) {
-                if (!server.isNode) {
-                    UpdateRow(stringResource(R.string.updates_panel), panel.version, updates.panel) { offer ->
-                        if (offer.master != null) {
-                            stringResource(R.string.updates_available, offer.latestVersion)
-                        } else {
-                            stringResource(R.string.panel_update_available_nodes, offer.nodes.joinToString { it.name })
-                        }
+                UpdateRow(stringResource(R.string.updates_panel), panel.version, updates.panel) { offer ->
+                    if (offer.master != null || server.isNode) {
+                        stringResource(R.string.updates_available, offer.latestVersion)
+                    } else {
+                        stringResource(R.string.panel_update_available_nodes, offer.nodes.joinToString { it.name })
                     }
-                    updates.panelOffer?.let { offer ->
-                        if (offer.master != null && offer.nodes.isNotEmpty()) {
-                            Text(
-                                stringResource(R.string.panel_update_available_nodes, offer.nodes.joinToString { it.name }),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                        Button(onClick = onUpdatePanel, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.action_update_panel, offer.latestVersion))
-                        }
+                }
+                updates.panelOffer?.let { offer ->
+                    if (!server.isNode && offer.master != null && offer.nodes.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.panel_update_available_nodes, offer.nodes.joinToString { it.name }),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Button(onClick = onUpdatePanel, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.action_update_panel, offer.latestVersion))
                     }
                 }
                 UpdateRow(stringResource(R.string.updates_xray), xrayVersion?.ifBlank { null } ?: "?", updates.xray) { offer ->

@@ -12,6 +12,7 @@ import dev.autorasqr.xuimanager.data.panel.awaitOnline
 import dev.autorasqr.xuimanager.domain.model.AppError
 import dev.autorasqr.xuimanager.domain.model.AppException
 import dev.autorasqr.xuimanager.domain.model.DeployState
+import dev.autorasqr.xuimanager.domain.model.NodePanelOffer
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateOffer
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateProgress
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateTarget
@@ -43,6 +44,7 @@ class PanelUpdateRepositoryImpl @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val progress = ConcurrentHashMap<Long, MutableStateFlow<PanelUpdateProgress?>>()
+    private val nodeProgress = ConcurrentHashMap<String, MutableStateFlow<PanelUpdateProgress?>>()
     private val checks = ConcurrentHashMap<Long, UpdateCheck<PanelUpdateOffer>>()
     private val prompted = ConcurrentHashMap.newKeySet<Long>()
 
@@ -106,8 +108,17 @@ class PanelUpdateRepositoryImpl @Inject constructor(
     }
 
     /** Returns what went wrong, one entry per node that did not end up on [PanelUpdateOffer.latestVersion]. */
-    private suspend fun updateNodes(serverId: Long, api: PanelApi, offer: PanelUpdateOffer, log: (String) -> Unit): List<String> {
-        val names = offer.nodes.associate { it.nodeId!! to it.name }
+    private suspend fun updateNodes(serverId: Long, api: PanelApi, offer: PanelUpdateOffer, log: (String) -> Unit): List<String> =
+        updateNodePanels(serverId, api, offer.nodes.associate { it.nodeId!! to it.name }, offer.latestVersion, log)
+
+    /** Asks the main panel to run the updater on [names]' nodes and follows them until they report [latestVersion]. */
+    private suspend fun updateNodePanels(
+        serverId: Long,
+        api: PanelApi,
+        names: Map<Int, String>,
+        latestVersion: String,
+        log: (String) -> Unit,
+    ): List<String> {
         log("Updating 3x-ui on the nodes: " + names.values.joinToString())
         val results = api.updateNodePanels(names.keys.toList())
         val problems = mutableListOf<String>()
@@ -123,6 +134,8 @@ class PanelUpdateRepositoryImpl @Inject constructor(
                 problems += "$name: $reason"
             }
         }
+        // A node missing from the answer may still have started; its version tells.
+        pending += names.keys - results.map { it.id }.toSet()
 
         val deadline = System.currentTimeMillis() + NODE_TIMEOUT_MS
         while (pending.isNotEmpty() && System.currentTimeMillis() < deadline) {
@@ -136,7 +149,7 @@ class PanelUpdateRepositoryImpl @Inject constructor(
                 } catch (e: Exception) {
                     continue
                 }
-                if ((PanelVersion.compare(version, offer.latestVersion) ?: -1) >= 0) {
+                if ((PanelVersion.compare(version, latestVersion) ?: -1) >= 0) {
                     pending -= id
                     val normalized = PanelVersion.normalize(version)
                     log("${names[id]}: now on $normalized")
@@ -148,7 +161,7 @@ class PanelUpdateRepositoryImpl @Inject constructor(
             }
         }
         pending.forEach { id ->
-            log("${names[id]}: still not on ${offer.latestVersion} after ${NODE_TIMEOUT_MS / 60_000} min")
+            log("${names[id]}: still not on $latestVersion after ${NODE_TIMEOUT_MS / 60_000} min")
             problems += "${names[id]}: not updated"
         }
         return problems
@@ -182,7 +195,39 @@ class PanelUpdateRepositoryImpl @Inject constructor(
         log("Main panel now runs $version")
     }
 
+    override fun nodeProgress(masterId: Long, nodeId: Int): StateFlow<PanelUpdateProgress?> = nodeFlowFor(masterId, nodeId)
+
+    override fun clearNodeProgress(masterId: Long, nodeId: Int) {
+        nodeFlowFor(masterId, nodeId).update { if (it?.state == DeployState.RUNNING) it else null }
+    }
+
+    override fun startNode(masterId: Long, offer: NodePanelOffer) {
+        val flow = nodeFlowFor(masterId, offer.nodeId)
+        if (flow.value?.state == DeployState.RUNNING) return
+        // The whole-panel update already covers this node.
+        if (flowFor(masterId).value?.state == DeployState.RUNNING) return
+        flow.value = PanelUpdateProgress(offer.latestVersion, DeployState.RUNNING, emptyList(), null)
+        val log: (String) -> Unit = { line -> flow.update { it?.copy(log = (it.log + line).takeLast(DeployConfig.MAX_LOG_LINES)) } }
+        scope.launch {
+            try {
+                val api = panels.forServer(masterId).second
+                val problems = updateNodePanels(masterId, api, mapOf(offer.nodeId to offer.name), offer.latestVersion, log)
+                if (problems.isNotEmpty()) throw AppException(AppError.PanelUpdateFailed(problems.joinToString("; ")))
+                flow.update { it?.copy(state = DeployState.SUCCEEDED) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val error = e.toAppError()
+                log("ERROR: $error")
+                flow.update { it?.copy(state = DeployState.FAILED, error = error) }
+            } finally {
+                checks.remove(masterId)
+            }
+        }
+    }
+
     private fun flowFor(serverId: Long) = progress.getOrPut(serverId) { MutableStateFlow(null) }
+    private fun nodeFlowFor(masterId: Long, nodeId: Int) = nodeProgress.getOrPut("$masterId:$nodeId") { MutableStateFlow(null) }
 
     companion object {
         private const val NODE_POLL_MS = 5_000L

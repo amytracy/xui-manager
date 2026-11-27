@@ -49,6 +49,10 @@ sealed interface AppError {
     data class InboundSavedWithWarning(val step: InboundSaveStep, val cause: AppError) : AppError
     /** reboot.sh could not schedule the restart, or the server did not come back in time ([detail] = "timeout"). */
     data class RebootFailed(val detail: String?) : AppError
+    /** An action run on every node failed on the nodes named in [nodes]; the log says why. */
+    data class NodeActionsFailed(val nodes: String) : AppError
+    /** The main panel reaches the node over plain HTTP; the in-app browser opens panels over HTTPS only. */
+    data object NodeWebNotHttps : AppError
     data object PanelUnauthorized : AppError
     data object PanelNotFound : AppError
     data object PanelNotDeployed : AppError

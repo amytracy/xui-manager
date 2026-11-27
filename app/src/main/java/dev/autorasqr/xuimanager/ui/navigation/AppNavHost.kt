@@ -58,8 +58,9 @@ data class DeployRoute(val serverId: Long)
 @Serializable
 data class ClientsRoute(val serverId: Long)
 
+/** With [nodeId] it is that node of [serverId]'s panel, which the app can't sign in to (no SSH): its login page opens. */
 @Serializable
-data class PanelRoute(val serverId: Long)
+data class PanelRoute(val serverId: Long, val nodeId: Int = 0)
 
 @Serializable
 data class InboundsRoute(val serverId: Long)
@@ -261,6 +262,7 @@ private fun NodesDestination(nav: NavHostController, onBack: (() -> Unit)?) {
         onAddPanel = { masterId -> nav.navigate(NodeEditRoute(masterId)) },
         onEdit = { masterId, nodeId -> nav.navigate(NodeEditRoute(masterId, nodeId)) },
         onServer = { id -> nav.navigate(ServerDetailRoute(id, fromNodes = true)) },
+        onOpenPanel = { serverId, nodeId -> nav.navigate(PanelRoute(serverId, nodeId)) },
         onDeploy = { id -> nav.navigate(DeployRoute(id)) },
         onConnectSsh = { masterId, node ->
             nav.navigate(ServerEditRoute(masterServerId = masterId, restoreNodeId = node.id, host = node.address, name = node.name))

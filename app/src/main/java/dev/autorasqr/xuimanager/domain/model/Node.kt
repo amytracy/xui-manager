@@ -93,3 +93,10 @@ data class NodeInbound(val tag: String, val remark: String, val protocol: String
 
 /** Where a new inbound can be placed. */
 data class NodeChoice(val id: Int, val name: String, val online: Boolean, val serverId: Long?)
+
+/** What can be done to a node; all but [UPDATE_PANEL] need the node's own server (SSH) in the app. */
+enum class NodeAction {
+    RESTART_XRAY, RESTART_PANEL, UPDATE_PANEL, UPDATE_XRAY, SYSTEM_UPDATE, REBOOT;
+
+    val needsSsh: Boolean get() = this != UPDATE_PANEL
+}

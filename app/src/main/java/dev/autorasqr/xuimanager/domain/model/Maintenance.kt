@@ -11,6 +11,9 @@ data class PanelUpdateOffer(
     val nodes: List<PanelUpdateTarget>,
 )
 
+/** A newer 3x-ui for one node, installed through its main panel. */
+data class NodePanelOffer(val nodeId: Int, val name: String, val currentVersion: String, val latestVersion: String)
+
 data class PanelUpdateProgress(
     val targetVersion: String,
     val state: DeployState,
@@ -65,6 +68,14 @@ data class RestoreProgress(
 
 /** Restarting the whole server on request, then waiting until it answers over SSH again. */
 data class RebootProgress(
+    val state: DeployState,
+    val log: List<String>,
+    val error: AppError?,
+)
+
+/** One action run on every node of a panel, one node after another. */
+data class NodeBulkProgress(
+    val action: NodeAction,
     val state: DeployState,
     val log: List<String>,
     val error: AppError?,

@@ -29,7 +29,7 @@ class PanelViewModel @Inject constructor(
     private val repository: PanelWebRepository,
 ) : ViewModel() {
 
-    private val serverId = savedStateHandle.toRoute<PanelRoute>().serverId
+    private val route = savedStateHandle.toRoute<PanelRoute>()
     private val _state = MutableStateFlow<PanelUiState>(PanelUiState.Loading)
     val state: StateFlow<PanelUiState> = _state.asStateFlow()
 
@@ -42,7 +42,8 @@ class PanelViewModel @Inject constructor(
         _state.value = PanelUiState.Loading
         viewModelScope.launch {
             _state.value = try {
-                PanelUiState.Ready(repository.openSession(serverId))
+                val session = if (route.nodeId > 0) repository.openNodeSession(route.serverId, route.nodeId) else repository.openSession(route.serverId)
+                PanelUiState.Ready(session)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

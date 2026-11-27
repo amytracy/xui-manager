@@ -1,5 +1,7 @@
 package dev.autorasqr.xuimanager.ui.clients
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -101,13 +103,15 @@ fun ClientsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    // Not tied to the message effect: consuming the message restarts that effect, which would dismiss the snackbar at once.
+    val snackbarScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
         val text = message.error?.message(context) ?: message.text?.let(context::getString)
         viewModel.consumeMessage()
-        if (text != null) snackbar.showSnackbar(text)
+        if (text != null) snackbarScope.launch { snackbar.showSnackbar(text) }
     }
 
     val appBarScroll = appBarScrollBehavior()

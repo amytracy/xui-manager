@@ -1,5 +1,7 @@
 package dev.autorasqr.xuimanager.ui.inbounds.editor
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,6 +68,8 @@ fun InboundEditorScreen(
 ) {
     val ui by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    // Not tied to the message effect: consuming the message restarts that effect, which would dismiss the snackbar at once.
+    val snackbarScope = rememberCoroutineScope()
     var confirmLeave by rememberSaveable { mutableStateOf(false) }
     val ru = LocalConfiguration.current.locales[0].language == "ru"
 
@@ -73,7 +77,8 @@ fun InboundEditorScreen(
     LaunchedEffect(ui.notice) {
         val notice = ui.notice ?: return@LaunchedEffect
         viewModel.consumeNotice()
-        snackbar.showSnackbar(if (ru) notice.ru else notice.en)
+        val text = if (ru) notice.ru else notice.en
+        snackbarScope.launch { snackbar.showSnackbar(text) }
     }
     BackHandler(enabled = ui.dirty && !ui.saved) { confirmLeave = true }
 

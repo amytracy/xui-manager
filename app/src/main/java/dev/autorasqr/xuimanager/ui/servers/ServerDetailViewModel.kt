@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.autorasqr.xuimanager.domain.model.AppError
 import dev.autorasqr.xuimanager.domain.model.AppUpdateOffer
 import dev.autorasqr.xuimanager.domain.model.DeployState
+import dev.autorasqr.xuimanager.domain.model.NodePanelOffer
 import dev.autorasqr.xuimanager.domain.model.PanelLogin
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateOffer
 import dev.autorasqr.xuimanager.domain.model.PanelUpdateProgress
@@ -29,6 +30,7 @@ import dev.autorasqr.xuimanager.domain.repository.XrayUpdateRepository
 import dev.autorasqr.xuimanager.ui.common.asAppError
 import dev.autorasqr.xuimanager.ui.navigation.ServerDetailRoute
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -40,6 +42,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
@@ -110,7 +113,13 @@ class ServerDetailViewModel @Inject constructor(
     private val _updateDialog = MutableStateFlow<UpdateDialog?>(null)
     val updateDialog: StateFlow<UpdateDialog?> = _updateDialog.asStateFlow()
 
-    val panelUpdate: StateFlow<PanelUpdateProgress?> = panelUpdates.progress(serverId)
+    /** A node's 3x-ui is updated through its main panel, so its progress lives there. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val panelUpdate: StateFlow<PanelUpdateProgress?> = server
+        .map { s -> s?.nodeTarget() }
+        .distinctUntilChanged()
+        .flatMapLatest { target -> if (target == null) panelUpdates.progress(serverId) else panelUpdates.nodeProgress(target.first, target.second) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val xrayUpdate: StateFlow<XrayUpdateProgress?> = xrayUpdates.progress(serverId)
     val systemUpdate: StateFlow<SystemUpdateProgress?> = systemUpdates.progress(serverId)
 
@@ -146,7 +155,9 @@ class ServerDetailViewModel @Inject constructor(
                 appUpdates.markPrompted()
                 pendingDialogs += UpdateDialog.APP
             }
-            if (found.panelOffer != null && panelUpdates.shouldPrompt(serverId) && panelUpdate.value?.state != DeployState.RUNNING) {
+            // A node's 3x-ui is offered by its main panel's screen; here it is only a row in the Updates card.
+            val isNode = server.value?.isNode == true
+            if (!isNode && found.panelOffer != null && panelUpdates.shouldPrompt(serverId) && panelUpdate.value?.state != DeployState.RUNNING) {
                 panelUpdates.markPrompted(serverId)
                 pendingDialogs += UpdateDialog.PANEL
             }
@@ -160,7 +171,7 @@ class ServerDetailViewModel @Inject constructor(
             // Once an update ends, what is left to offer (a node that did not make it) comes from a fresh check.
             panelUpdate.map { it?.state }.distinctUntilChanged().collect { state ->
                 if (state == DeployState.SUCCEEDED || state == DeployState.FAILED) {
-                    val panel = panelUpdates.check(serverId, refresh = true)
+                    val panel = panelCheck(server.value, refresh = true)
                     _updates.update { it.copy(panel = panel) }
                 }
             }
@@ -188,14 +199,25 @@ class ServerDetailViewModel @Inject constructor(
         val result = coroutineScope {
             val app = async { appUpdates.check(refresh) }
             // Nodes are updated from their main panel's offer; their own Xray is updated here.
-            val panel = async {
-                if (current == null || current.isNode || current.panel == null) UpdateCheck.Unavailable() else panelUpdates.check(serverId, refresh)
-            }
+            val panel = async { panelCheck(current, refresh) }
             val xray = async { if (current?.panel == null) UpdateCheck.Unavailable() else xrayUpdates.check(serverId, refresh) }
             UpdatesUiState(app.await(), panel.await(), xray.await())
         }
         _updates.value = result
         return result
+    }
+
+    /** The main panel's own check; for a node, this node's part of its main panel's check. */
+    private suspend fun panelCheck(current: Server?, refresh: Boolean): UpdateCheck<PanelUpdateOffer> {
+        if (current?.panel == null) return UpdateCheck.Unavailable()
+        val (masterId, nodeId) = current.nodeTarget() ?: return if (current.isNode) UpdateCheck.Unavailable() else panelUpdates.check(serverId, refresh)
+        return when (val check = panelUpdates.check(masterId, refresh)) {
+            is UpdateCheck.Available -> {
+                val target = check.offer.nodes.firstOrNull { it.nodeId == nodeId }
+                if (target == null) UpdateCheck.UpToDate else UpdateCheck.Available(PanelUpdateOffer(check.offer.latestVersion, null, listOf(target)))
+            }
+            else -> check
+        }
     }
 
     private fun showNextDialog() {
@@ -236,10 +258,19 @@ class ServerDetailViewModel @Inject constructor(
     fun startPanelUpdate() {
         if (_updateDialog.value == UpdateDialog.PANEL) showNextDialog()
         val offer = _updates.value.panelOffer ?: return
-        panelUpdates.start(serverId, offer)
+        val target = server.value?.nodeTarget()
+        if (target == null) {
+            panelUpdates.start(serverId, offer)
+        } else {
+            val node = offer.nodes.firstOrNull { it.nodeId == target.second } ?: return
+            panelUpdates.startNode(target.first, NodePanelOffer(target.second, node.name, node.currentVersion, offer.latestVersion))
+        }
     }
 
-    fun dismissPanelUpdate() = panelUpdates.clearProgress(serverId)
+    fun dismissPanelUpdate() {
+        val target = server.value?.nodeTarget()
+        if (target == null) panelUpdates.clearProgress(serverId) else panelUpdates.clearNodeProgress(target.first, target.second)
+    }
 
     fun startXrayUpdate() {
         if (_updateDialog.value == UpdateDialog.XRAY) showNextDialog()
@@ -337,4 +368,11 @@ class ServerDetailViewModel @Inject constructor(
     private companion object {
         const val STATUS_INTERVAL_MS = 5_000L
     }
+}
+
+/** Main panel id and node id of a node registered on its main panel; null for any other server. */
+private fun Server.nodeTarget(): Pair<Long, Int>? {
+    val master = masterServerId ?: return null
+    val node = nodeId ?: return null
+    return master to node
 }

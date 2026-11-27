@@ -1,5 +1,7 @@
 package dev.autorasqr.xuimanager.ui.inbounds
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -89,6 +91,8 @@ fun InboundsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    // Not tied to the message effect: consuming the message restarts that effect, which would dismiss the snackbar at once.
+    val snackbarScope = rememberCoroutineScope()
     val resources = LocalResources.current
 
     // Back from the full editor: show what it saved.
@@ -101,7 +105,8 @@ fun InboundsScreen(
     LaunchedEffect(state.message) {
         val message = state.message ?: return@LaunchedEffect
         viewModel.consumeMessage()
-        snackbar.showSnackbar(resources.getString(message))
+        val text = resources.getString(message)
+        snackbarScope.launch { snackbar.showSnackbar(text) }
     }
 
     val appBarScroll = appBarScrollBehavior()
